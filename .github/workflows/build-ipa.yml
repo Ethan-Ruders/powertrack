@@ -1,0 +1,91 @@
+name: Build & Publish PowerTrack IPA
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "README.md"
+      - ".gitignore"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build-and-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Unsigned IPA & Create Release
+    runs-on: xcode-27
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Xcode version
+        run: xcodebuild -version
+
+      - name: Build unsigned Release app
+        run: |
+          xcodebuild \
+            -project PowerTrack.xcodeproj \
+            -scheme PowerTrack \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package PowerTrack.ipa
+        run: |
+          rm -rf Payload PowerTrack.ipa
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/PowerTrack.app Payload/
+          zip -qry PowerTrack.ipa Payload
+          ls -lh PowerTrack.ipa
+
+      - name: Generate SideStore source.json
+        env:
+          RELEASE_TAG: build-${{ github.run_number }}
+        run: |
+          python3 .github/scripts/generate_source.py \
+            --plist build/Build/Products/Release-iphoneos/PowerTrack.app/Info.plist \
+            --ipa PowerTrack.ipa \
+            --icon "PowerTrack/Assets.xcassets/AppIcon.appiconset/2026-08-13_15-59-05_Lumina.png" \
+            --out-dir pages
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: build-${{ github.run_number }}
+        run: |
+          gh release create "$TAG" \
+            --title "PowerTrack Build #${{ github.run_number }}" \
+            --notes "Build automatique depuis ${{ github.sha }}" \
+            PowerTrack.ipa \
+            pages/source.json
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages
+
+  deploy-pages:
+    name: Deploy SideStore Source to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

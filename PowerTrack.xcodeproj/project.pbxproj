@@ -6,11 +6,62 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		FB136C8D305BD73300B35EAA /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB136C8C305BD73300B35EAA /* WidgetKit.framework */; };
+		FB136C8F305BD73300B35EAA /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB136C8E305BD73300B35EAA /* SwiftUI.framework */; };
+		FB136C9C305BD73500B35EAA /* PowerTrackWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FB136C8A305BD73300B35EAA /* PowerTrackWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		FB136C9A305BD73500B35EAA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FBB545853002871C0078EE1C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FB136C89305BD73300B35EAA;
+			remoteInfo = PowerTrackWidgetsExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		FB136CA1305BD73500B35EAA /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				FB136C9C305BD73500B35EAA /* PowerTrackWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		FB136C8A305BD73300B35EAA /* PowerTrackWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PowerTrackWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		FB136C8C305BD73300B35EAA /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		FB136C8E305BD73300B35EAA /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		FBB5458D3002871C0078EE1C /* PowerTrack.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PowerTrack.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		FB136C9D305BD73500B35EAA /* Exceptions for "PowerTrackWidgets" folder in "PowerTrackWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = FB136C89305BD73300B35EAA /* PowerTrackWidgetsExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		FB136C90305BD73300B35EAA /* PowerTrackWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				FB136C9D305BD73500B35EAA /* Exceptions for "PowerTrackWidgets" folder in "PowerTrackWidgetsExtension" target */,
+			);
+			path = PowerTrackWidgets;
+			sourceTree = "<group>";
+		};
 		FBB5458F3002871C0078EE1C /* PowerTrack */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PowerTrack;
@@ -19,6 +70,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		FB136C87305BD73300B35EAA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FB136C8F305BD73300B35EAA /* SwiftUI.framework in Frameworks */,
+				FB136C8D305BD73300B35EAA /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FBB5458A3002871C0078EE1C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -29,10 +89,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FB136C8B305BD73300B35EAA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				FB136C8C305BD73300B35EAA /* WidgetKit.framework */,
+				FB136C8E305BD73300B35EAA /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		FBB545843002871C0078EE1C = {
 			isa = PBXGroup;
 			children = (
 				FBB5458F3002871C0078EE1C /* PowerTrack */,
+				FB136C90305BD73300B35EAA /* PowerTrackWidgets */,
+				FB136C8B305BD73300B35EAA /* Frameworks */,
 				FBB5458E3002871C0078EE1C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +112,7 @@
 			isa = PBXGroup;
 			children = (
 				FBB5458D3002871C0078EE1C /* PowerTrack.app */,
+				FB136C8A305BD73300B35EAA /* PowerTrackWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +120,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		FB136C89305BD73300B35EAA /* PowerTrackWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FB136C9E305BD73500B35EAA /* Build configuration list for PBXNativeTarget "PowerTrackWidgetsExtension" */;
+			buildPhases = (
+				FB136C86305BD73300B35EAA /* Sources */,
+				FB136C87305BD73300B35EAA /* Frameworks */,
+				FB136C88305BD73300B35EAA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				FB136C90305BD73300B35EAA /* PowerTrackWidgets */,
+			);
+			name = PowerTrackWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = PowerTrackWidgetsExtension;
+			productReference = FB136C8A305BD73300B35EAA /* PowerTrackWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		FBB5458C3002871C0078EE1C /* PowerTrack */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = FBB5459A3002871E0078EE1C /* Build configuration list for PBXNativeTarget "PowerTrack" */;
@@ -55,10 +149,12 @@
 				FBB545893002871C0078EE1C /* Sources */,
 				FBB5458A3002871C0078EE1C /* Frameworks */,
 				FBB5458B3002871C0078EE1C /* Resources */,
+				FB136CA1305BD73500B35EAA /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				FB136C9B305BD73500B35EAA /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				FBB5458F3002871C0078EE1C /* PowerTrack */,
@@ -77,9 +173,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2660;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
+					FB136C89305BD73300B35EAA = {
+						CreatedOnToolsVersion = 27.0;
+					};
 					FBB5458C3002871C0078EE1C = {
 						CreatedOnToolsVersion = 26.6;
 					};
@@ -100,11 +199,19 @@
 			projectRoot = "";
 			targets = (
 				FBB5458C3002871C0078EE1C /* PowerTrack */,
+				FB136C89305BD73300B35EAA /* PowerTrackWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		FB136C88305BD73300B35EAA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FBB5458B3002871C0078EE1C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +222,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		FB136C86305BD73300B35EAA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FBB545893002871C0078EE1C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -124,7 +238,79 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		FB136C9B305BD73500B35EAA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FB136C89305BD73300B35EAA /* PowerTrackWidgetsExtension */;
+			targetProxy = FB136C9A305BD73500B35EAA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		FB136C9F305BD73500B35EAA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A2H9BRHXKX;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PowerTrackWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PowerTrackWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ethanruders.PowerTrack.PowerTrackWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FB136CA0305BD73500B35EAA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A2H9BRHXKX;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PowerTrackWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PowerTrackWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ethanruders.PowerTrack.PowerTrackWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		FBB545983002871E0078EE1C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -256,6 +442,7 @@
 				DEVELOPMENT_TEAM = A2H9BRHXKX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -288,6 +475,7 @@
 				DEVELOPMENT_TEAM = A2H9BRHXKX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -313,6 +501,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		FB136C9E305BD73500B35EAA /* Build configuration list for PBXNativeTarget "PowerTrackWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FB136C9F305BD73500B35EAA /* Debug */,
+				FB136CA0305BD73500B35EAA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		FBB545883002871C0078EE1C /* Build configuration list for PBXProject "PowerTrack" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

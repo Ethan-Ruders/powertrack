@@ -13,8 +13,11 @@ struct BlocListView: View {
     
     @Query(sort: \MacroBloc.nom) private var blocs: [MacroBloc]
     @ObservedObject private var progressTracker = SeanceProgressTracker.shared
+    @ObservedObject private var exportManager = ExportManager.shared
     
     @State private var isShowingInitView = false
+    @State private var isShowingProgramImport = false
+    @State private var isShowingExportSettings = false
     @State private var messageConfirmation: String? = nil
     @State private var showingConfirmationAlert = false
     
@@ -37,21 +40,34 @@ struct BlocListView: View {
                                 .font(.headline)
                                 .foregroundColor(.white)
                             
-                            Text("Créez un bloc personnalisé ou injectez le programme Peak Force & PR.")
+                            Text("Créez un bloc personnalisé ou importez un programme JSON du coach.")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                             
-                            Button(action: injecterBlocPredefini) {
-                                Text("Injecter Peak Force & PR (S5-S8)")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(.black)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(Color.orange)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            VStack(spacing: 10) {
+                                Button(action: { isShowingInitView = true }) {
+                                    Text("Nouveau Bloc Personnalisé")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(.black)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(Color.orange)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                                
+                                Button(action: { isShowingProgramImport = true }) {
+                                    Text("Importer un Bloc JSON (Coach)")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(Color(white: 0.18))
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                             .padding(.top, 4)
                         }
                         .padding(24)
@@ -110,14 +126,31 @@ struct BlocListView: View {
                 }
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { isShowingExportSettings = true }) {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "server.rack")
+                                .font(.body)
+                                .foregroundColor(.orange)
+                            
+                            if !exportManager.pendingQueue.isEmpty {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: 3, y: -3)
+                            }
+                        }
+                    }
+                }
+                
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button(action: { isShowingInitView = true }) {
                             Label("Nouveau Bloc Personnalisé", systemImage: "plus")
                         }
                         
-                        Button(action: injecterBlocPredefini) {
-                            Label("Injecter Peak Force & PR (S5-S8)", systemImage: "bolt.fill")
+                        Button(action: { isShowingProgramImport = true }) {
+                            Label("Importer un Bloc JSON (Coach)", systemImage: "square.and.arrow.down")
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
@@ -129,6 +162,15 @@ struct BlocListView: View {
             .preferredColorScheme(.dark)
             .sheet(isPresented: $isShowingInitView) {
                 BlocInitView()
+            }
+            .sheet(isPresented: $isShowingProgramImport) {
+                ProgramImportSheet { bloc in
+                    messageConfirmation = "Le bloc '\(bloc.nom)' a été importé avec succès."
+                    showingConfirmationAlert = true
+                }
+            }
+            .sheet(isPresented: $isShowingExportSettings) {
+                ExportSettingsView()
             }
             .alert("Programmation", isPresented: $showingConfirmationAlert) {
                 Button("OK", role: .cancel) { }
@@ -144,20 +186,6 @@ struct BlocListView: View {
         HapticAndSoundManager.shared.triggerLightImpact()
         modelContext.delete(bloc)
         try? modelContext.save()
-    }
-    
-    private func injecterBlocPredefini() {
-        do {
-            let bloc = try PeakForceProgramInjector.injecterBlocPeakForce(into: modelContext)
-            HapticAndSoundManager.shared.triggerSetValidated()
-            messageConfirmation = "Le bloc '\(bloc.nom)' a été injecté avec succès."
-            showingConfirmationAlert = true
-        } catch {
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.error)
-            messageConfirmation = "Erreur : \(error.localizedDescription)"
-            showingConfirmationAlert = true
-        }
     }
 }
 

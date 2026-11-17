@@ -162,7 +162,7 @@ final class Exercice {
         let motsClesSBD = [
             "squat", "bench", "développé couché", "developpe couche", "deadlift",
             "soulevé de terre", "souleve de terre", "spoto", "3ct", "larsen",
-            "pause", "tempo", "deficit", "déficit", "block pull", "incliné", "incline"
+            "pause", "tempo", "deficit", "déficit", "block pull"
         ]
         if categorie == .competition || motsClesSBD.contains(where: { lower.contains($0) }) {
             return .sbdOuVariante
@@ -241,6 +241,7 @@ final class SeanceProgressTracker: ObservableObject {
     private let defaults = UserDefaults.standard
     private let activeDatePrefix = "pt_seance_active_date_"
     private let startTimePrefix = "pt_seance_start_time_"
+    private let endTimePrefix = "pt_seance_end_time_"
     private let closedPrefix = "pt_seance_closed_"
     
     private init() {}
@@ -253,6 +254,7 @@ final class SeanceProgressTracker: ObservableObject {
         if defaults.object(forKey: startTimePrefix + key) == nil {
             defaults.set(Date(), forKey: startTimePrefix + key)
         }
+        defaults.removeObject(forKey: endTimePrefix + key)
         lastUpdateToken = UUID()
     }
     
@@ -267,10 +269,28 @@ final class SeanceProgressTracker: ObservableObject {
         return now
     }
     
+    /// Retourne l'heure de début enregistrée pour la séance, si disponible
+    func sessionStartDate(for seance: Seance) -> Date? {
+        defaults.object(forKey: startTimePrefix + seance.trackingKey) as? Date
+    }
+    
+    /// Retourne l'heure de clôture enregistrée pour la séance, si disponible
+    func sessionEndDate(for seance: Seance) -> Date? {
+        defaults.object(forKey: endTimePrefix + seance.trackingKey) as? Date
+    }
+    
+    /// Calcule la durée réelle écoulée en minutes depuis le début de la séance
+    func sessionDurationMinutes(for seance: Seance) -> Int? {
+        guard let start = sessionStartDate(for: seance) else { return nil }
+        let end = sessionEndDate(for: seance) ?? Date()
+        return max(1, Int(round(end.timeIntervalSince(start) / 60.0)))
+    }
+    
     /// Marque la séance comme clôturée (lorsque l'utilisateur clique sur "Terminer la séance")
     func markSeanceClosed(_ seance: Seance) {
         let key = seance.trackingKey
         defaults.set(true, forKey: closedPrefix + key)
+        defaults.set(Date(), forKey: endTimePrefix + key)
         lastUpdateToken = UUID()
     }
     

@@ -10,6 +10,7 @@ struct SeanceDetailView: View {
     
     @State private var exercicePourEchauffement: Exercice? = nil
     @State private var isShowingSummarySheet = false
+    @State private var isShowingExportSheet = false
     @State private var dateDebutSeance: Date = Date()
     @State private var prSerieIDs: Set<PersistentIdentifier> = []
     
@@ -170,10 +171,7 @@ struct SeanceDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: {
                     HapticAndSoundManager.shared.triggerLightImpact()
-                    Task {
-                        let webhookTestURL = "https://webhook.site/7be51dbd-0546-476b-8690-56228dc2d0ed"
-                        await ExportManager.shared.exporterSeance(seance: seance, webhookURL: webhookTestURL)
-                    }
+                    isShowingExportSheet = true
                 }) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.body)
@@ -203,6 +201,9 @@ struct SeanceDetailView: View {
         }
         .sheet(isPresented: $isShowingSummarySheet) {
             SeanceSummarySheet(seance: seance)
+        }
+        .sheet(isPresented: $isShowingExportSheet) {
+            SeanceExportSheet(seance: seance)
         }
     }
     

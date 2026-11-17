@@ -20,6 +20,7 @@ struct TopSetSummaryItem: Identifiable {
 struct SeanceSummarySheet: View {
     let seance: Seance
     @Environment(\.dismiss) private var dismiss
+    @State private var isShowingExportSheet = false
     
     // Calculs de synthèse
     private var seriesValidees: [(exercice: Exercice, serie: Serie)] {
@@ -122,9 +123,9 @@ struct SeanceSummarySheet: View {
                         )
                         
                         kpiCard(
-                            titre: "Durée Estimée",
+                            titre: dureeReelleMinutes != nil ? "Durée Séance" : "Durée Estimée",
                             valeur: dureeEstimeeTexte,
-                            detail: "Repos & Exécution",
+                            detail: dureeReelleMinutes != nil ? "Temps réel enregistré" : "Repos & Exécution",
                             systemImage: "stopwatch.fill",
                             couleur: .blue
                         )
@@ -196,18 +197,36 @@ struct SeanceSummarySheet: View {
                         .padding(.horizontal)
                     }
                     
-                    Button(action: {
-                        let impact = UINotificationFeedbackGenerator()
-                        impact.notificationOccurred(.success)
-                        dismiss()
-                    }) {
-                        Text("Valider et Fermer")
-                            .font(.headline)
-                            .foregroundColor(.black)
+                    VStack(spacing: 10) {
+                        Button(action: {
+                            HapticAndSoundManager.shared.triggerLightImpact()
+                            isShowingExportSheet = true
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "paperplane.fill")
+                                Text("Ressentis & Export (n8n)")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.orange)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.orange)
+                            .padding(.vertical, 14)
+                            .background(Color(white: 0.14))
                             .cornerRadius(12)
+                        }
+                        
+                        Button(action: {
+                            let impact = UINotificationFeedbackGenerator()
+                            impact.notificationOccurred(.success)
+                            dismiss()
+                        }) {
+                            Text("Valider et Fermer")
+                                .font(.headline)
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.orange)
+                                .cornerRadius(12)
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
@@ -224,6 +243,9 @@ struct SeanceSummarySheet: View {
                     }
                     .foregroundColor(.gray)
                 }
+            }
+            .sheet(isPresented: $isShowingExportSheet) {
+                SeanceExportSheet(seance: seance)
             }
             .preferredColorScheme(.dark)
         }
@@ -258,9 +280,12 @@ struct SeanceSummarySheet: View {
         .cornerRadius(14)
     }
     
+    private var dureeReelleMinutes: Int? {
+        SeanceProgressTracker.shared.sessionDurationMinutes(for: seance)
+    }
+    
     private var dureeEstimeeTexte: String {
-        // Estimation basée sur les temps de repos des séries validées (~3 min / série + warmup)
-        let minutes = max(45, seriesValidees.count * 4)
+        let minutes = dureeReelleMinutes ?? max(45, seriesValidees.count * 4)
         let h = minutes / 60
         let m = minutes % 60
         return h > 0 ? "\(h)h \(m)m" : "\(m) min"

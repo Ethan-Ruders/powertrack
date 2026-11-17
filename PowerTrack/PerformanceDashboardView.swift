@@ -320,7 +320,7 @@ struct PerformanceDashboardView: View {
         case .squat:
             return lower.contains("squat")
         case .bench:
-            return lower.contains("bench") || lower.contains("développé couché") || lower.contains("spoto") || lower.contains("larsen")
+            return lower.contains("bench") || lower.contains("développé couché") || lower.contains("spoto") || lower.contains("larsen") || lower.contains("3ct")
         case .deadlift:
             return lower.contains("deadlift") || lower.contains("soulevé de terre") || lower.contains("block pull")
         }

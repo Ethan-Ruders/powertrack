@@ -22,8 +22,8 @@ struct BlocInitView: View {
     // Variantes sélectionnées par mouvement
     @State private var variantesParMouvement: [MouvementCompetition: Set<VarianteMouvement>] = [
         .squat: [.pauseSquat],
-        .bench: [.spotoPress, .larsenPress],
-        .deadlift: [.deficitDeadlift]
+        .bench: [.benchTempo],
+        .deadlift: [.pauseDeadlift]
     ]
     
     // Ratios personnalisés des variantes
@@ -31,8 +31,9 @@ struct BlocInitView: View {
     
     // 1RM
     @State private var squat1RM: Double = 165.0
-    @State private var bench1RM: Double = 120.0
+    @State private var bench1RM: Double = 130.0
     @State private var deadlift1RM: Double = 190.0
+    @State private var inclureSemaineTestPR: Bool = false
     
     // Gestion d'erreur
     @State private var messageErreur: String?
@@ -314,11 +315,30 @@ struct BlocInitView: View {
                 }
             }
             
+            Section(
+                header: Text("Option Fin de Bloc"),
+                footer: Text("Par défaut, le bloc dure 4 semaines et culmine sur un pic contrôlé (RPE 8.5). Activez l'option Test PR pour ajouter une Semaine 5 (taper en début de semaine + tests PR en 1 journée).")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            ) {
+                Toggle(isOn: $inclureSemaineTestPR) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ajouter Semaine 5 : Taper & Test PR")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.white)
+                        Text("Taper lun/mer puis simulation plateau le samedi")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .tint(.orange)
+            }
+            
             Section(header: Text("Résumé du Bloc")) {
                 HStack {
                     Text("Durée")
                     Spacer()
-                    Text("4 Semaines")
+                    Text(inclureSemaineTestPR ? "5 Semaines (4 + Taper/PR)" : "4 Semaines")
                         .foregroundColor(.gray)
                 }
                 
@@ -461,6 +481,7 @@ struct BlocInitView: View {
             squat1RM: squat1RM,
             bench1RM: bench1RM,
             deadlift1RM: deadlift1RM,
+            inclureSemaineTestPR: inclureSemaineTestPR,
             dateDebut: Date()
         )
         
@@ -489,21 +510,20 @@ struct BlocInitView: View {
     
     private func descriptionGabarit(_ gabarit: GabaritProgramme) -> String {
         switch gabarit {
-        case .squatOnly: return "Cas 1 : Squat Only (2 séances / semaine)"
-        case .deadliftOnly: return "Cas 2 : Deadlift Only (2 séances / semaine)"
-        case .benchOnly: return "Cas 3 : Bench Only (3 séances / semaine)"
+        case .squatOnly: return "Cas 1 : Squat Only (4 séances / semaine)"
+        case .deadliftOnly: return "Cas 2 : Deadlift Only (4 séances / semaine)"
+        case .benchOnly: return "Cas 3 : Bench Only (4 séances / semaine)"
         case .squatBench: return "Cas 4 : Squat + Bench (4 séances / semaine)"
         case .squatDeadlift: return "Cas 5 : Squat + Deadlift (3 séances / semaine)"
-        case .benchDeadlift: return "Cas 6 : Bench + Deadlift (3 séances / semaine)"
+        case .benchDeadlift: return "Cas 6 : Bench + Deadlift (4 séances / semaine)"
         case .fullSBD: return "Cas 7 : Full SBD (4 séances / semaine)"
         }
     }
     
     private func frequenceGabarit(_ gabarit: GabaritProgramme) -> String {
         switch gabarit {
-        case .squatOnly, .deadliftOnly: return "2 séances / semaine"
-        case .benchOnly, .squatDeadlift, .benchDeadlift: return "3 séances / semaine"
-        case .squatBench, .fullSBD: return "4 séances / semaine"
+        case .squatDeadlift: return "3 séances / semaine"
+        case .squatOnly, .deadliftOnly, .benchOnly, .squatBench, .benchDeadlift, .fullSBD: return "4 séances / semaine"
         }
     }
 }

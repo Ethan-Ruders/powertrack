@@ -43,6 +43,32 @@ final class MacroBloc {
         self.bench1RM = bench1RM
         self.deadlift1RM = deadlift1RM
     }
+    
+    /// Nombre total de séries programmées sur tout le bloc.
+    var totalSeriesCount: Int {
+        semaines.reduce(0) { $0 + $1.totalSeriesCount }
+    }
+    
+    /// Nombre total de séries validées sur tout le bloc.
+    var validatedSeriesCount: Int {
+        semaines.reduce(0) { $0 + $1.validatedSeriesCount }
+    }
+    
+    /// Ratio de complétion global du bloc (0.0 à 1.0).
+    var progressionRatio: Double {
+        let total = totalSeriesCount
+        guard total > 0 else { return 0.0 }
+        return Double(validatedSeriesCount) / Double(total)
+    }
+    
+    /// Numéro de la première semaine inachevée (ou de la dernière semaine si tout est validé).
+    var activeSemaineNumero: Int? {
+        let tries = semaines.sorted { $0.numero < $1.numero }
+        if let firstIncomplete = tries.first(where: { $0.validatedSeriesCount < $0.totalSeriesCount }) {
+            return firstIncomplete.numero
+        }
+        return tries.last?.numero
+    }
 }
 
 @Model
@@ -57,6 +83,28 @@ final class Semaine {
     init(numero: Int, nom: String) {
         self.numero = numero
         self.nom = nom
+    }
+    
+    /// Nombre total de séries programmées dans la semaine.
+    var totalSeriesCount: Int {
+        seances.reduce(0) { $0 + $1.totalSeriesCount }
+    }
+    
+    /// Nombre total de séries validées dans la semaine.
+    var validatedSeriesCount: Int {
+        seances.reduce(0) { $0 + $1.validatedSeriesCount }
+    }
+    
+    /// Nombre de séances entièrement terminées dans la semaine.
+    var completedSeancesCount: Int {
+        seances.filter { $0.totalSeriesCount > 0 && $0.validatedSeriesCount == $0.totalSeriesCount }.count
+    }
+    
+    /// Ratio de complétion de la semaine (0.0 à 1.0).
+    var progressionRatio: Double {
+        let total = totalSeriesCount
+        guard total > 0 else { return 0.0 }
+        return Double(validatedSeriesCount) / Double(total)
     }
 }
 

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct TopSetSummaryItem: Identifiable {
     let id = UUID()
@@ -58,8 +59,7 @@ struct SeanceSummarySheet: View {
     
     private var topSetsRealises: [TopSetSummaryItem] {
         var items: [TopSetSummaryItem] = []
-        for ex in seance.exercices {
-            // Prendre la série la plus lourde de l'exercice
+        for ex in seance.exercices.sorted(by: { $0.ordre < $1.ordre }) {
             let seriesVal = ex.series.filter { $0.estValidee }
             if let heaviest = seriesVal.max(by: { ($0.chargeSaisie ?? 0) < ($1.chargeSaisie ?? 0) }) {
                 items.append(TopSetSummaryItem(
@@ -78,170 +78,150 @@ struct SeanceSummarySheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Badge de félicitation
-                    VStack(spacing: 8) {
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 56))
-                            .foregroundColor(.orange)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    // Hero éditorial
+                    VStack(alignment: .leading, spacing: 6) {
+                        PTKicker(text: "Séance clôturée · \(dureeEstimeeTexte)", color: PTTheme.success)
                         
-                        Text("Séance Terminée !")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(String(format: "%.2f", tonnageTotalTonnes))
+                                .font(.system(size: 42, weight: .bold).monospacedDigit())
+                                .foregroundColor(PTTheme.textPrimary)
+                            Text("t soulevées")
+                                .font(.title3.weight(.medium))
+                                .foregroundColor(PTTheme.textSecondary)
+                        }
                         
-                        Text(seance.titre ?? seance.date.formatted(date: .complete, time: .omitted))
+                        Text("\(seance.titre ?? seance.date.formatted(date: .abbreviated, time: .omitted)) · \(Int(tonnageTotalKg)) kg au total")
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(PTTheme.textSecondary)
                     }
-                    .padding(.top, 16)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 20)
                     
-                    // Grille KPI
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                        kpiCard(
-                            titre: "Tonnage Total",
-                            valeur: String(format: "%.2f t", tonnageTotalTonnes),
-                            detail: "\(Int(tonnageTotalKg)) kg déplacés",
-                            systemImage: "scalemass.fill",
-                            couleur: .orange
-                        )
-                        
-                        kpiCard(
-                            titre: "Meilleur e1RM",
-                            valeur: meilleurE1RMSession != nil ? "\(Int(meilleurE1RMSession!.charge)) kg" : "-",
-                            detail: meilleurE1RMSession?.exercice ?? "Aucun calculé",
-                            systemImage: "flame.fill",
-                            couleur: .red
-                        )
-                        
-                        kpiCard(
-                            titre: "Séries Validées",
-                            valeur: "\(seriesValidees.count)",
-                            detail: "sur \(seance.exercices.reduce(0) { $0 + $1.series.count }) programmées",
-                            systemImage: "checklist.checked",
-                            couleur: .green
-                        )
-                        
-                        kpiCard(
-                            titre: dureeReelleMinutes != nil ? "Durée Séance" : "Durée Estimée",
-                            valeur: dureeEstimeeTexte,
-                            detail: dureeReelleMinutes != nil ? "Temps réel enregistré" : "Repos & Exécution",
-                            systemImage: "stopwatch.fill",
-                            couleur: .blue
-                        )
-                    }
-                    .padding(.horizontal)
+                    PTHairline()
                     
-                    // Liste des Top Sets avec RPE Réel vs Cible
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Top Sets & Intensité")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal)
+                    // Lignes KPI épurées
+                    metricRow(
+                        label: "Meilleur e1RM",
+                        value: meilleurE1RMSession.map { "\(PTFormat.weight($0.charge)) kg" } ?? "-",
+                        detail: meilleurE1RMSession?.exercice,
+                        valueColor: PTTheme.accent
+                    )
+                    PTHairline(leadingInset: 20)
+                    
+                    metricRow(
+                        label: "Séries validées",
+                        value: "\(seriesValidees.count) / \(seance.totalSeriesCount)",
+                        detail: "\(Int(round(seance.progressionRatio * 100.0)))%",
+                        valueColor: PTTheme.textPrimary
+                    )
+                    PTHairline(leadingInset: 20)
+                    
+                    metricRow(
+                        label: "Durée",
+                        value: dureeEstimeeTexte,
+                        detail: dureeReelleMinutes != nil ? "Temps réel" : "Estimée",
+                        valueColor: PTTheme.textPrimary
+                    )
+                    PTHairline()
+                    
+                    // Top Sets & Intensité
+                    if !topSetsRealises.isEmpty {
+                        PTKicker(text: "Top Sets & Intensité")
+                            .padding(.horizontal, 20)
+                            .padding(.top, 22)
+                            .padding(.bottom, 10)
                         
-                        VStack(spacing: 10) {
-                            ForEach(topSetsRealises) { top in
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(top.nomExercice)
-                                            .font(.subheadline.bold())
-                                            .foregroundColor(.white)
+                        PTHairline()
+                        
+                        ForEach(Array(topSetsRealises.enumerated()), id: \.element.id) { index, top in
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(top.nomExercice)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(PTTheme.textPrimary)
+                                        .lineLimit(1)
+                                    
+                                    HStack(spacing: 6) {
+                                        Text("\(PTFormat.weight(top.charge)) kg × \(top.reps)")
+                                            .font(.caption.monospacedDigit())
+                                            .foregroundColor(PTTheme.textSecondary)
                                         
-                                        HStack(spacing: 6) {
-                                            Text("\(Int(top.charge)) kg × \(top.reps)")
-                                                .font(.caption)
-                                                .foregroundColor(.orange)
-                                            
-                                            if let e1rm = top.e1RM {
-                                                Text("• e1RM: \(Int(e1rm)) kg")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.gray)
-                                            }
+                                        if let e1rm = top.e1RM {
+                                            Text("· e1RM \(PTFormat.weight(e1rm)) kg")
+                                                .font(.caption.monospacedDigit())
+                                                .foregroundColor(PTTheme.accent)
                                         }
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    // Badge RPE Cible vs Réel
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        HStack(spacing: 4) {
-                                            Text("RPE")
-                                                .font(.caption2)
-                                                .foregroundColor(.gray)
-                                            
-                                            if let reel = top.rpeReel {
-                                                Text(String(format: "%.1f", reel))
-                                                    .font(.subheadline.bold())
-                                                    .foregroundColor(couleurPourRPE(reel: reel, cible: top.rpeCible))
-                                            } else {
-                                                Text("-")
-                                                    .font(.subheadline.bold())
-                                                    .foregroundColor(.gray)
-                                            }
-                                        }
-                                        
-                                        Text("cible: @\(String(format: "%.0f", top.rpeCible))")
-                                            .font(.caption2)
-                                            .foregroundColor(.gray)
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Color(UIColor.darkGray).opacity(0.4))
-                                    .cornerRadius(8)
                                 }
-                                .padding(12)
-                                .background(Color(UIColor.secondarySystemBackground).opacity(0.3))
-                                .cornerRadius(12)
+                                
+                                Spacer(minLength: 6)
+                                
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    if let reel = top.rpeReel {
+                                        Text("@\(PTFormat.rpe(reel))")
+                                            .font(.subheadline.weight(.bold).monospacedDigit())
+                                            .foregroundColor(couleurPourRPE(reel: reel, cible: top.rpeCible))
+                                    } else {
+                                        Text("-")
+                                            .font(.subheadline.weight(.bold))
+                                            .foregroundColor(PTTheme.textSecondary)
+                                    }
+                                    
+                                    Text("cible @\(PTFormat.rpe(top.rpeCible))")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundColor(PTTheme.textTertiary)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 13)
+                            
+                            if index < topSetsRealises.count - 1 {
+                                PTHairline(leadingInset: 20)
+                            } else {
+                                PTHairline()
                             }
                         }
-                        .padding(.horizontal)
                     }
                     
+                    // Actions finales
                     VStack(spacing: 10) {
                         Button(action: {
                             HapticAndSoundManager.shared.triggerLightImpact()
                             isShowingExportSheet = true
                         }) {
                             HStack(spacing: 8) {
-                                Image(systemName: "paperplane.fill")
+                                Image(systemName: "paperplane")
                                 Text("Ressentis & Export (n8n)")
                             }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.orange)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color(white: 0.14))
-                            .cornerRadius(12)
                         }
+                        .buttonStyle(PTSecondaryPillButtonStyle())
                         
                         Button(action: {
                             let impact = UINotificationFeedbackGenerator()
                             impact.notificationOccurred(.success)
                             dismiss()
                         }) {
-                            Text("Valider et Fermer")
-                                .font(.headline)
-                                .foregroundColor(.black)
+                            Text("Valider et fermer")
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.orange)
-                                .cornerRadius(12)
                         }
+                        .buttonStyle(PTPrimaryPillButtonStyle())
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+                    .padding(.bottom, 28)
                 }
-                .padding(.bottom, 24)
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.black)
+            .background(PTTheme.bg.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Fermer") {
                         dismiss()
                     }
-                    .foregroundColor(.gray)
+                    .foregroundColor(PTTheme.textSecondary)
                 }
             }
             .sheet(isPresented: $isShowingExportSheet) {
@@ -253,31 +233,26 @@ struct SeanceSummarySheet: View {
     
     // MARK: - Helpers UI
     
-    private func kpiCard(titre: String, valeur: String, detail: String, systemImage: String, couleur: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: systemImage)
-                    .foregroundColor(couleur)
-                Spacer()
-            }
-            
-            Text(valeur)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-            
+    private func metricRow(label: String, value: String, detail: String?, valueColor: Color) -> some View {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(titre)
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundColor(couleur.opacity(0.8))
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundColor(PTTheme.textSecondary)
+                if let detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundColor(PTTheme.textTertiary)
+                        .lineLimit(1)
+                }
             }
+            Spacer()
+            Text(value)
+                .font(.headline.weight(.bold).monospacedDigit())
+                .foregroundColor(valueColor)
         }
-        .padding(14)
-        .background(Color(UIColor.secondarySystemBackground).opacity(0.3))
-        .cornerRadius(14)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
     }
     
     private var dureeReelleMinutes: Int? {
@@ -294,11 +269,11 @@ struct SeanceSummarySheet: View {
     private func couleurPourRPE(reel: Double, cible: Double) -> Color {
         let diff = reel - cible
         if diff <= 0.0 {
-            return .green // Respect parfait ou plus facile
+            return PTTheme.success
         } else if diff <= 0.5 {
-            return .orange // Légèrement plus dur
+            return PTTheme.accent
         } else {
-            return .red // Dépassement d'effort
+            return PTTheme.danger
         }
     }
 }

@@ -81,6 +81,17 @@ struct WidgetPasserReposIntent: AppIntent {
     }
 }
 
+// MARK: - Palette Locale Widget (Flighty / Swiss Editorial)
+
+private enum PTWidgetPalette {
+    static let bg = Color(red: 0.035, green: 0.035, blue: 0.043)         // #09090B
+    static let surfacePill = Color(red: 0.094, green: 0.094, blue: 0.110) // #18181C
+    static let hairline = Color.white.opacity(0.12)
+    static let chalkWhite = Color(red: 0.961, green: 0.961, blue: 0.969)  // #F5F5F7
+    static let copper = Color(red: 0.871, green: 0.478, blue: 0.259)      // #DE7A42
+    static let muted = Color(red: 0.541, green: 0.541, blue: 0.580)       // #8A8A94
+}
+
 // MARK: - Widget Live Activity Dédié
 
 public struct RestTimerLiveActivityWidget: Widget {
@@ -90,54 +101,60 @@ public struct RestTimerLiveActivityWidget: Widget {
         ActivityConfiguration(for: RestTimerAttributes.self) { context in
             // Interface Écran Verrouillé & Centre de notifications
             RestTimerLiveActivityView(state: context.state)
-                .activityBackgroundTint(Color.black.opacity(0.85))
+                .activityBackgroundTint(PTWidgetPalette.bg.opacity(0.92))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label(context.state.nomExercice, systemImage: "figure.strengthtraining.traditional")
-                        .font(.caption.bold())
-                        .foregroundColor(.orange)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("REPOS · SÉRIE \(context.state.numeroSerie)")
+                            .font(.system(size: 9, weight: .semibold))
+                            .tracking(0.9)
+                            .foregroundColor(PTWidgetPalette.copper)
+                        Text(context.state.nomExercice)
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(PTWidgetPalette.chalkWhite)
+                            .lineLimit(1)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(timerInterval: Date()...context.state.dateFinRepos, pauseTime: nil, countsDown: true)
-                        .font(.title2.monospacedDigit())
-                        .fontWeight(.bold)
-                        .foregroundColor(.orange)
+                        .font(.title2.weight(.bold).monospacedDigit())
+                        .foregroundColor(PTWidgetPalette.chalkWhite)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 10) {
                         ProgressView(timerInterval: Date()...context.state.dateFinRepos)
-                            .tint(.orange)
+                            .tint(PTWidgetPalette.copper)
                         
                         HStack {
                             Button(intent: WidgetAjouterTempsIntent()) {
                                 Label("+30s", systemImage: "goforward.30")
-                                    .font(.caption2.bold())
+                                    .font(.caption2.weight(.bold))
                             }
-                            .tint(.orange)
+                            .tint(PTWidgetPalette.copper)
                             
                             Spacer()
                             
                             Button(intent: WidgetPasserReposIntent()) {
-                                Label("Passer", systemImage: "xmark")
-                                    .font(.caption2.bold())
+                                Text("Passer")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundColor(PTWidgetPalette.bg)
                             }
-                            .tint(.gray)
+                            .tint(PTWidgetPalette.chalkWhite)
                         }
                     }
                 }
             } compactLeading: {
                 Image(systemName: "timer")
-                    .foregroundColor(.orange)
+                    .foregroundColor(PTWidgetPalette.copper)
             } compactTrailing: {
                 Text(timerInterval: Date()...context.state.dateFinRepos, pauseTime: nil, countsDown: true)
                     .monospacedDigit()
-                    .foregroundColor(.orange)
+                    .foregroundColor(PTWidgetPalette.chalkWhite)
                     .frame(width: 45)
             } minimal: {
                 Image(systemName: "timer")
-                    .foregroundColor(.orange)
+                    .foregroundColor(PTWidgetPalette.copper)
             }
         }
     }
@@ -154,81 +171,78 @@ public struct RestTimerLiveActivityView: View {
     
     public var body: some View {
         VStack(spacing: 12) {
-            // 1. En-tête : Exercice, Série & Décompte temps réel
-            HStack(alignment: .center) {
-                HStack(spacing: 10) {
-                    ZStack {
+            // 1. En-tête : Sur-titre télémétrie, exercice & décompte temps réel
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 5) {
                         Circle()
-                            .fill(Color.orange.opacity(0.2))
-                            .frame(width: 38, height: 38)
-                        Image(systemName: "timer")
-                            .font(.headline)
-                            .foregroundColor(.orange)
+                            .fill(PTWidgetPalette.copper)
+                            .frame(width: 6, height: 6)
+                        
+                        Text("REPOS · SÉRIE \(state.numeroSerie)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.0)
+                            .foregroundColor(PTWidgetPalette.copper)
                     }
                     
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(state.nomExercice)
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        
-                        Text("Série \(state.numeroSerie) validée • Temps de repos")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
+                    Text(state.nomExercice)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(PTWidgetPalette.chalkWhite)
+                        .lineLimit(1)
                 }
                 
                 Spacer()
                 
-                // Compte à rebours dynamique natif Apple (décompte fluide continu sans surcoût batterie)
+                // Compte à rebours dynamique natif Apple (décompte fluide continu)
                 Text(timerInterval: Date()...state.dateFinRepos, pauseTime: nil, countsDown: true)
-                    .font(.system(size: 30, weight: .bold, design: .monospaced))
-                    .foregroundColor(.orange)
+                    .font(.system(size: 32, weight: .bold).monospacedDigit())
+                    .foregroundColor(PTWidgetPalette.chalkWhite)
             }
             
-            // 2. Barre de progression visuelle continue
+            // 2. Barre de progression cuivre ultra-fine
             ProgressView(timerInterval: Date()...state.dateFinRepos)
-                .progressViewStyle(LinearProgressViewStyle(tint: .orange))
-                .scaleEffect(x: 1, y: 1.6, anchor: .center)
+                .progressViewStyle(LinearProgressViewStyle(tint: PTWidgetPalette.copper))
                 .clipShape(Capsule())
             
-            // 3. Pied avec boutons interactifs AppIntents
-            HStack(spacing: 12) {
-                Text("Fin : \(state.dateFinRepos.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption2)
-                    .foregroundColor(.gray)
+            // 3. Pied avec actions AppIntents style Flighty
+            HStack(spacing: 10) {
+                Text("FIN · \(state.dateFinRepos.formatted(date: .omitted, time: .shortened))")
+                    .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                    .tracking(0.8)
+                    .foregroundColor(PTWidgetPalette.muted)
                 
                 Spacer()
                 
-                // Bouton interactif +30s
                 Button(intent: WidgetAjouterTempsIntent()) {
                     Label("+30s", systemImage: "goforward.30")
-                        .font(.caption.bold())
-                        .foregroundColor(.orange)
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(PTWidgetPalette.copper)
                         .padding(.vertical, 6)
                         .padding(.horizontal, 12)
-                        .background(Color.white.opacity(0.12))
-                        .cornerRadius(8)
+                        .background(PTWidgetPalette.surfacePill)
+                        .overlay(
+                            Capsule()
+                                .stroke(PTWidgetPalette.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(Capsule())
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                // Bouton interactif Passer
                 Button(intent: WidgetPasserReposIntent()) {
-                    Label("Passer", systemImage: "xmark")
-                        .font(.caption.bold())
-                        .foregroundColor(.gray)
+                    Text("Passer")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(PTWidgetPalette.bg)
                         .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
-                        .background(Color.white.opacity(0.12))
-                        .cornerRadius(8)
+                        .padding(.horizontal, 14)
+                        .background(PTWidgetPalette.chalkWhite)
+                        .clipShape(Capsule())
                 }
                 .buttonStyle(PlainButtonStyle())
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(Color(UIColor.systemBackground).opacity(0.2))
+        .background(PTWidgetPalette.bg)
         .preferredColorScheme(.dark)
     }
 }

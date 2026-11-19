@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct BlocInitView: View {
     @Environment(\.modelContext) private var modelContext
@@ -39,43 +40,49 @@ struct BlocInitView: View {
     @State private var messageErreur: String?
     @State private var showingErrorAlert: Bool = false
     
+    private var stepTitle: String {
+        switch etapeCourante {
+        case 1: return "Mouvements & Gabarit"
+        case 2: return "Variantes & Coefficients"
+        case 3: return "1RM & Finalisation"
+        default: return ""
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Indicateur d'étape (Entonnoir)
                 stepperHeader
-                    .padding(.vertical, 12)
-                    .background(Color(UIColor.secondarySystemBackground).opacity(0.4))
                 
-                // Formulaire selon étape
-                Form {
-                    switch etapeCourante {
-                    case 1:
-                        etape1MouvementsView
-                    case 2:
-                        etape2VariantesView
-                    case 3:
-                        etape31RMView
-                    default:
-                        EmptyView()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        switch etapeCourante {
+                        case 1:
+                            etape1MouvementsView
+                        case 2:
+                            etape2VariantesView
+                        case 3:
+                            etape31RMView
+                        default:
+                            EmptyView()
+                        }
                     }
+                    .padding(.vertical, 20)
                 }
-                .scrollContentBackground(.hidden)
-                .background(Color.black)
+                .scrollDismissesKeyboard(.interactively)
                 
-                // Barre de navigation inférieure
                 navigationBottomBar
-                    .padding()
-                    .background(Color(UIColor.secondarySystemBackground).opacity(0.3))
             }
+            .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Nouveau Bloc")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annuler") {
                         dismiss()
                     }
-                    .foregroundColor(.gray)
+                    .foregroundColor(PTTheme.textSecondary)
                 }
             }
             .preferredColorScheme(.dark)
@@ -90,98 +97,117 @@ struct BlocInitView: View {
     // MARK: - En-tête de Progression
     
     private var stepperHeader: some View {
-        HStack(spacing: 12) {
-            etapeBadge(numero: 1, titre: "Mouvements")
-            chevronDivider
-            etapeBadge(numero: 2, titre: "Variantes")
-            chevronDivider
-            etapeBadge(numero: 3, titre: "1RM")
-        }
-        .padding(.horizontal)
-    }
-    
-    private func etapeBadge(numero: Int, titre: String) -> some View {
-        HStack(spacing: 6) {
-            ZStack {
-                Circle()
-                    .fill(etapeCourante == numero ? Color.orange : (etapeCourante > numero ? Color.green : Color.gray.opacity(0.4)))
-                    .frame(width: 24, height: 24)
-                
-                if etapeCourante > numero {
-                    Image(systemName: "checkmark")
-                        .font(.caption2.bold())
-                        .foregroundColor(.black)
-                } else {
-                    Text("\(numero)")
-                        .font(.caption2.bold())
-                        .foregroundColor(etapeCourante == numero ? .black : .white)
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                PTKicker(text: "Étape \(etapeCourante) sur 3", color: PTTheme.accent)
+                Spacer()
+                PTKicker(text: stepTitle, color: PTTheme.textPrimary)
             }
+            .padding(.horizontal, 16)
             
-            Text(titre)
-                .font(.caption)
-                .fontWeight(etapeCourante == numero ? .bold : .regular)
-                .foregroundColor(etapeCourante == numero ? .orange : .gray)
+            PTProgressHairline(ratio: Double(etapeCourante) / 3.0)
         }
-    }
-    
-    private var chevronDivider: some View {
-        Image(systemName: "chevron.right")
-            .font(.caption2)
-            .foregroundColor(.gray.opacity(0.5))
+        .padding(.top, 10)
+        .background(PTTheme.bg)
     }
     
     // MARK: - Étape 1 : Mouvements
     
     private var etape1MouvementsView: some View {
-        Group {
-            Section(header: Text("Configuration générale")) {
-                TextField("Nom du bloc", text: $nomBloc)
-                    .font(.body)
-            }
-            
-            Section(
-                header: Text("1. Mouvements de Compétition"),
-                footer: Text("Sélectionnez au moins un mouvement. Un des 7 gabarits de programmation sera automatiquement assigné.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            ) {
-                ForEach(MouvementCompetition.allCases) { mouv in
-                    let isSelected = mouvementsSelectionnes.contains(mouv)
-                    Button(action: {
-                        toggleMouvement(mouv)
-                    }) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(mouv.rawValue)
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                
-                                Text(sousTitrePour(mouv))
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                .font(.title3)
-                                .foregroundColor(isSelected ? .orange : .gray)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .buttonStyle(PlainButtonStyle())
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 8) {
+                PTKicker(text: "Configuration générale")
+                    .padding(.horizontal, 16)
+                
+                VStack(spacing: 0) {
+                    PTHairline()
+                    TextField("Nom du bloc", text: $nomBloc)
+                        .font(.body.weight(.medium))
+                        .foregroundColor(PTTheme.textPrimary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(PTTheme.surface)
+                    PTHairline()
                 }
             }
             
+            VStack(alignment: .leading, spacing: 8) {
+                PTKicker(text: "1. Mouvements de compétition")
+                    .padding(.horizontal, 16)
+                
+                VStack(spacing: 0) {
+                    PTHairline()
+                    ForEach(MouvementCompetition.allCases) { mouv in
+                        let isSelected = mouvementsSelectionnes.contains(mouv)
+                        Button {
+                            toggleMouvement(mouv)
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(mouv.rawValue)
+                                        .font(.body.weight(.semibold))
+                                        .foregroundColor(PTTheme.textPrimary)
+                                    
+                                    Text(sousTitrePour(mouv))
+                                        .font(.caption)
+                                        .foregroundColor(PTTheme.textSecondary)
+                                }
+                                
+                                Spacer()
+                                
+                                ZStack {
+                                    Circle()
+                                        .fill(isSelected ? PTTheme.textPrimary : Color.clear)
+                                        .frame(width: 22, height: 22)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(isSelected ? PTTheme.textPrimary : PTTheme.hairlineStrong, lineWidth: 1)
+                                        )
+                                    
+                                    if isSelected {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(PTTheme.bg)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        
+                        PTHairline(leadingInset: 16)
+                    }
+                }
+                
+                Text("Sélectionnez au moins un mouvement. Un des 7 gabarits de programmation sera automatiquement assigné.")
+                    .font(.caption)
+                    .foregroundColor(PTTheme.textTertiary)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+            }
+            
             if let gabarit = GabaritProgramme.determiner(mouvements: mouvementsSelectionnes) {
-                Section(header: Text("Gabarit assigné")) {
-                    HStack {
-                        Image(systemName: "calendar.badge.clock")
-                            .foregroundColor(.orange)
-                        Text(descriptionGabarit(gabarit))
-                            .font(.subheadline)
-                            .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 8) {
+                    PTKicker(text: "Gabarit assigné")
+                        .padding(.horizontal, 16)
+                    
+                    VStack(spacing: 0) {
+                        PTHairline()
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(PTTheme.accent)
+                                .frame(width: 6, height: 6)
+                            Text(descriptionGabarit(gabarit))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(PTTheme.textPrimary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(PTTheme.surface)
+                        PTHairline()
                     }
                 }
             }
@@ -191,222 +217,277 @@ struct BlocInitView: View {
     // MARK: - Étape 2 : Variantes & Ratios
     
     private var etape2VariantesView: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 24) {
             ForEach(Array(mouvementsSelectionnes).sorted(by: { $0.rawValue < $1.rawValue })) { mouv in
-                Section(
-                    header: Text("Variantes \(mouv.rawValue)"),
-                    footer: Text("Sélectionnez les variantes souhaitées et ajustez le ratio appliqué au 1RM de référence.")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                ) {
-                    ForEach(mouv.variantesDisponibles) { variante in
-                        let isSelected = isVarianteSelected(variante, for: mouv)
-                        VStack(spacing: 8) {
-                            HStack {
-                                Button(action: {
-                                    toggleVariante(variante, for: mouv)
-                                }) {
-                                    HStack {
-                                        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                                            .foregroundColor(isSelected ? .orange : .gray)
-                                            .font(.title3)
-                                        
-                                        Text(variante.rawValue)
-                                            .font(.body)
-                                            .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 8) {
+                    PTKicker(text: "Variantes · \(mouv.rawValue)")
+                        .padding(.horizontal, 16)
+                    
+                    VStack(spacing: 0) {
+                        PTHairline()
+                        
+                        ForEach(mouv.variantesDisponibles) { variante in
+                            let isSelected = isVarianteSelected(variante, for: mouv)
+                            VStack(spacing: 12) {
+                                HStack {
+                                    Button {
+                                        toggleVariante(variante, for: mouv)
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            ZStack {
+                                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                                    .fill(isSelected ? PTTheme.textPrimary : Color.clear)
+                                                    .frame(width: 20, height: 20)
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                                            .stroke(isSelected ? PTTheme.textPrimary : PTTheme.hairlineStrong, lineWidth: 1)
+                                                    )
+                                                
+                                                if isSelected {
+                                                    Image(systemName: "checkmark")
+                                                        .font(.system(size: 11, weight: .bold))
+                                                        .foregroundColor(PTTheme.bg)
+                                                }
+                                            }
+                                            
+                                            Text(variante.rawValue)
+                                                .font(.body.weight(.medium))
+                                                .foregroundColor(PTTheme.textPrimary)
+                                        }
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    
+                                    Spacer()
+                                    
+                                    if isSelected {
+                                        let currentRatio = ratioFor(variante)
+                                        Text("\(Int(round(currentRatio * 100)))% 1RM")
+                                            .font(.caption.weight(.semibold).monospacedDigit())
+                                            .foregroundColor(PTTheme.accent)
                                     }
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                
-                                Spacer()
                                 
                                 if isSelected {
-                                    let currentRatio = ratioFor(variante)
-                                    Text("\(Int(currentRatio * 100))% du 1RM")
-                                        .font(.caption.bold())
-                                        .foregroundColor(.orange)
+                                    HStack(spacing: 12) {
+                                        Text("Coefficient")
+                                            .font(.caption)
+                                            .foregroundColor(PTTheme.textSecondary)
+                                        
+                                        Slider(
+                                            value: Binding(
+                                                get: { ratioFor(variante) },
+                                                set: { ratiosVariantes[variante] = $0 }
+                                            ),
+                                            in: 0.70...1.05,
+                                            step: 0.01
+                                        )
+                                        .tint(PTTheme.accent)
+                                        
+                                        Text(String(format: "%.2f", ratioFor(variante)))
+                                            .font(.caption.weight(.semibold).monospacedDigit())
+                                            .foregroundColor(PTTheme.textPrimary)
+                                            .frame(width: 40, alignment: .trailing)
+                                    }
+                                    .padding(.leading, 32)
                                 }
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
                             
-                            if isSelected {
-                                HStack {
-                                    Text("Coefficient:")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                    
-                                    Slider(
-                                        value: Binding(
-                                            get: { ratioFor(variante) },
-                                            set: { ratiosVariantes[variante] = $0 }
-                                        ),
-                                        in: 0.70...1.05,
-                                        step: 0.01
-                                    )
-                                    .tint(.orange)
-                                    
-                                    Text(String(format: "%.2f", ratioFor(variante)))
-                                        .font(.caption.monospacedDigit())
-                                        .foregroundColor(.white)
-                                        .frame(width: 38, alignment: .trailing)
-                                }
-                                .padding(.leading, 28)
-                            }
+                            PTHairline(leadingInset: 16)
                         }
-                        .padding(.vertical, 4)
                     }
                 }
             }
+            
+            Text("Sélectionnez les variantes souhaitées et ajustez le ratio appliqué au 1RM de référence.")
+                .font(.caption)
+                .foregroundColor(PTTheme.textTertiary)
+                .padding(.horizontal, 16)
         }
     }
     
     // MARK: - Étape 3 : Saisie des 1RM
     
     private var etape31RMView: some View {
-        Group {
-            Section(
-                header: Text("1RM de Référence (kg)"),
-                footer: Text("Renseignez vos charges maximales pour les mouvements programmés. Toutes les séries et variantes seront calculées automatiquement.")
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 8) {
+                PTKicker(text: "1RM de référence (kg)")
+                    .padding(.horizontal, 16)
+                
+                VStack(spacing: 0) {
+                    PTHairline()
+                    
+                    if mouvementsSelectionnes.contains(.squat) {
+                        oneRMRow(titre: "Squat", placeholder: "Squat", value: $squat1RM)
+                        PTHairline(leadingInset: 16)
+                    }
+                    
+                    if mouvementsSelectionnes.contains(.bench) {
+                        oneRMRow(titre: "Bench Press", placeholder: "Bench", value: $bench1RM)
+                        PTHairline(leadingInset: 16)
+                    }
+                    
+                    if mouvementsSelectionnes.contains(.deadlift) {
+                        oneRMRow(titre: "Deadlift", placeholder: "Deadlift", value: $deadlift1RM)
+                        PTHairline(leadingInset: 16)
+                    }
+                }
+                
+                Text("Renseignez vos charges maximales pour les mouvements programmés. Toutes les séries et variantes seront calculées automatiquement.")
                     .font(.caption)
-                    .foregroundColor(.gray)
-            ) {
-                if mouvementsSelectionnes.contains(.squat) {
-                    HStack {
-                        Label("Squat", systemImage: "figure.cross.training")
-                            .foregroundColor(.white)
-                        Spacer()
-                        TextField("Squat", value: $squat1RM, format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .font(.headline)
-                            .frame(width: 90)
-                        Text("kg")
-                            .foregroundColor(.gray)
-                    }
-                }
-                
-                if mouvementsSelectionnes.contains(.bench) {
-                    HStack {
-                        Label("Bench Press", systemImage: "figure.strengthtraining.traditional")
-                            .foregroundColor(.white)
-                        Spacer()
-                        TextField("Bench", value: $bench1RM, format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .font(.headline)
-                            .frame(width: 90)
-                        Text("kg")
-                            .foregroundColor(.gray)
-                    }
-                }
-                
-                if mouvementsSelectionnes.contains(.deadlift) {
-                    HStack {
-                        Label("Deadlift", systemImage: "scalemass.fill")
-                            .foregroundColor(.white)
-                        Spacer()
-                        TextField("Deadlift", value: $deadlift1RM, format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .font(.headline)
-                            .frame(width: 90)
-                        Text("kg")
-                            .foregroundColor(.gray)
-                    }
-                }
+                    .foregroundColor(PTTheme.textTertiary)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
             }
             
-            Section(
-                header: Text("Option Fin de Bloc"),
-                footer: Text("Par défaut, le bloc dure 4 semaines et culmine sur un pic contrôlé (RPE 8.5). Activez l'option Test PR pour ajouter une Semaine 5 (taper en début de semaine + tests PR en 1 journée).")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            ) {
-                Toggle(isOn: $inclureSemaineTestPR) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Ajouter Semaine 5 : Taper & Test PR")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundColor(.white)
-                        Text("Taper lun/mer puis simulation plateau le samedi")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+            VStack(alignment: .leading, spacing: 8) {
+                PTKicker(text: "Option fin de bloc")
+                    .padding(.horizontal, 16)
+                
+                VStack(spacing: 0) {
+                    PTHairline()
+                    Toggle(isOn: $inclureSemaineTestPR) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Ajouter Semaine 5 : Taper & Test PR")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(PTTheme.textPrimary)
+                            Text("Taper lun/mer puis simulation plateau le samedi")
+                                .font(.caption)
+                                .foregroundColor(PTTheme.textSecondary)
+                        }
                     }
-                }
-                .tint(.orange)
-            }
-            
-            Section(header: Text("Résumé du Bloc")) {
-                HStack {
-                    Text("Durée")
-                    Spacer()
-                    Text(inclureSemaineTestPR ? "5 Semaines (4 + Taper/PR)" : "4 Semaines")
-                        .foregroundColor(.gray)
+                    .tint(PTTheme.accent)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    PTHairline()
                 }
                 
-                if let gabarit = GabaritProgramme.determiner(mouvements: mouvementsSelectionnes) {
+                Text("Par défaut, le bloc dure 4 semaines et culmine sur un pic contrôlé (RPE 8.5). Activez l'option Test PR pour ajouter une Semaine 5 (taper en début de semaine + tests PR en 1 journée).")
+                    .font(.caption)
+                    .foregroundColor(PTTheme.textTertiary)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                PTKicker(text: "Résumé du bloc")
+                    .padding(.horizontal, 16)
+                
+                VStack(spacing: 0) {
+                    PTHairline()
+                    
                     HStack {
-                        Text("Fréquence")
+                        Text("Durée")
+                            .font(.subheadline)
+                            .foregroundColor(PTTheme.textSecondary)
                         Spacer()
-                        Text(frequenceGabarit(gabarit))
-                            .foregroundColor(.orange)
+                        Text(inclureSemaineTestPR ? "5 semaines (4 + Taper/PR)" : "4 semaines")
+                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                            .foregroundColor(PTTheme.textPrimary)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
+                    
+                    if let gabarit = GabaritProgramme.determiner(mouvements: mouvementsSelectionnes) {
+                        PTHairline(leadingInset: 16)
+                        HStack {
+                            Text("Fréquence")
+                                .font(.subheadline)
+                                .foregroundColor(PTTheme.textSecondary)
+                            Spacer()
+                            Text(frequenceGabarit(gabarit))
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                                .foregroundColor(PTTheme.accent)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 13)
+                    }
+                    
+                    PTHairline()
                 }
             }
         }
     }
     
-    // MARK: - Barre de Navigation Inférieure
-    
-    private var navigationBottomBar: some View {
+    private func oneRMRow(titre: String, placeholder: String, value: Binding<Double>) -> some View {
         HStack {
-            if etapeCourante > 1 {
-                Button(action: {
-                    withAnimation {
-                        etapeCourante -= 1
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: "chevron.left")
-                        Text("Précédent")
-                    }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 20)
-                    .background(Color(UIColor.darkGray))
-                    .cornerRadius(10)
-                }
-            }
+            Text(titre)
+                .font(.body.weight(.medium))
+                .foregroundColor(PTTheme.textPrimary)
             
             Spacer()
             
-            if etapeCourante < 3 {
-                Button(action: allerEtapeSuivante) {
-                    HStack {
-                        Text("Suivant")
-                        Image(systemName: "chevron.right")
+            HStack(spacing: 6) {
+                TextField(placeholder, value: value, format: .number)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .font(.title3.weight(.bold).monospacedDigit())
+                    .foregroundColor(PTTheme.textPrimary)
+                    .frame(width: 82)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(PTTheme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(PTTheme.hairline, lineWidth: 0.5)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                
+                Text("kg")
+                    .font(.subheadline)
+                    .foregroundColor(PTTheme.textSecondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+    
+    // MARK: - Barre de Navigation Inférieure
+    
+    private var navigationBottomBar: some View {
+        VStack(spacing: 0) {
+            PTHairline()
+            
+            HStack(spacing: 12) {
+                if etapeCourante > 1 {
+                    Button {
+                        withAnimation {
+                            etapeCourante -= 1
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.left")
+                                .font(.caption.weight(.bold))
+                            Text("Précédent")
+                        }
                     }
-                    .font(.headline)
-                    .foregroundColor(.black)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 24)
-                    .background(mouvementsSelectionnes.isEmpty ? Color.gray : Color.orange)
-                    .cornerRadius(10)
+                    .buttonStyle(PTSecondaryPillButtonStyle())
                 }
-                .disabled(mouvementsSelectionnes.isEmpty)
-            } else {
-                Button(action: validerEtGenerer) {
-                    HStack {
-                        Image(systemName: "sparkles")
-                        Text("Générer le Bloc")
+                
+                Spacer()
+                
+                if etapeCourante < 3 {
+                    Button(action: allerEtapeSuivante) {
+                        HStack(spacing: 6) {
+                            Text("Suivant")
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                        }
                     }
-                    .font(.headline)
-                    .foregroundColor(.black)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 24)
-                    .background(Color.orange)
-                    .cornerRadius(10)
+                    .buttonStyle(PTPrimaryPillButtonStyle(isDisabled: mouvementsSelectionnes.isEmpty))
+                    .disabled(mouvementsSelectionnes.isEmpty)
+                } else {
+                    Button(action: validerEtGenerer) {
+                        Text("Créer le bloc")
+                    }
+                    .buttonStyle(PTPrimaryPillButtonStyle())
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(PTTheme.bg)
         }
     }
     
@@ -426,7 +507,7 @@ struct BlocInitView: View {
     }
     
     private func isVarianteSelected(_ variante: VarianteMouvement, for mouv: MouvementCompetition) -> Bool {
-        return variantesParMouvement[mouv]?.contains(variante) ?? false
+        variantesParMouvement[mouv]?.contains(variante) ?? false
     }
     
     private func toggleVariante(_ variante: VarianteMouvement, for mouv: MouvementCompetition) {
@@ -442,7 +523,7 @@ struct BlocInitView: View {
     }
     
     private func ratioFor(_ variante: VarianteMouvement) -> Double {
-        return ratiosVariantes[variante] ?? variante.ratioParDefaut
+        ratiosVariantes[variante] ?? variante.ratioParDefaut
     }
     
     private func allerEtapeSuivante() {

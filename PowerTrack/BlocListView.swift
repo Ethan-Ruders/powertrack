@@ -29,78 +29,15 @@ struct BlocListView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 12) {
-                    if blocs.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "dumbbell.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(.secondary)
-                            
-                            Text("Aucun bloc de programmation")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            
-                            Text("Créez un bloc personnalisé ou importez un programme JSON du coach.")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                            
-                            VStack(spacing: 10) {
-                                Button(action: { isShowingInitView = true }) {
-                                    Text("Nouveau Bloc Personnalisé")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundColor(.black)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 12)
-                                        .background(Color.orange)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                }
-                                .buttonStyle(.plain)
-                                
-                                Button(action: { isShowingProgramImport = true }) {
-                                    Text("Importer un Bloc JSON (Coach)")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 12)
-                                        .background(Color(white: 0.18))
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(.top, 4)
-                        }
-                        .padding(24)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(white: 0.11))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .padding(.top, 20)
-                    } else {
+                if blocs.isEmpty {
+                    emptyStateView
+                } else {
+                    LazyVStack(spacing: 0) {
+                        PTHairline()
+                        
                         ForEach(blocs) { bloc in
                             NavigationLink(destination: SemaineListView(macroBloc: bloc)) {
-                                HStack(spacing: 12) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(bloc.nom)
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                            .lineLimit(1)
-                                            .minimumScaleFactor(0.85)
-                                        
-                                        Text("\(bloc.semaines.count) semaines")
-                                            .font(.subheadline.monospacedDigit())
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(1)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.footnote.weight(.semibold))
-                                        .foregroundColor(.orange)
-                                }
-                                .padding(16)
-                                .background(Color(white: 0.11))
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                blocRow(for: bloc)
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
@@ -110,13 +47,15 @@ struct BlocListView: View {
                                     Label("Supprimer le bloc", systemImage: "trash")
                                 }
                             }
+                            
+                            PTHairline(leadingInset: 20)
                         }
                     }
+                    .padding(.top, 8)
                 }
-                .padding(16)
             }
-            .background(Color.black.ignoresSafeArea())
-            .navigationTitle("Mes Blocs")
+            .background(PTTheme.bg.ignoresSafeArea())
+            .navigationTitle("Programmation")
             .safeAreaInset(edge: .bottom) {
                 if let seanceActive = seanceEnCours {
                     ResumeWorkoutBannerView(seance: seanceActive)
@@ -131,11 +70,11 @@ struct BlocListView: View {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: "server.rack")
                                 .font(.body)
-                                .foregroundColor(.orange)
+                                .foregroundColor(PTTheme.textSecondary)
                             
                             if !exportManager.pendingQueue.isEmpty {
                                 Circle()
-                                    .fill(Color.red)
+                                    .fill(PTTheme.danger)
                                     .frame(width: 8, height: 8)
                                     .offset(x: 3, y: -3)
                             }
@@ -153,9 +92,9 @@ struct BlocListView: View {
                             Label("Importer un Bloc JSON (Coach)", systemImage: "square.and.arrow.down")
                         }
                     } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.orange)
+                        Image(systemName: "plus")
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(PTTheme.textPrimary)
                     }
                 }
             }
@@ -180,6 +119,112 @@ struct BlocListView: View {
         }
     }
     
+    // MARK: - Sous-vues Éditoriales
+    
+    private var emptyStateView: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                PTKicker(text: "Programmation", color: PTTheme.accent)
+                
+                Text("Aucun bloc actif")
+                    .font(.title2.weight(.bold))
+                    .foregroundColor(PTTheme.textPrimary)
+                
+                Text("Crée un cycle sur 4 ou 5 semaines ou importe un programme JSON généré par ton coach.")
+                    .font(.subheadline)
+                    .foregroundColor(PTTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            VStack(spacing: 10) {
+                Button(action: { isShowingInitView = true }) {
+                    Text("Nouveau bloc")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PTPrimaryPillButtonStyle())
+                
+                Button(action: { isShowingProgramImport = true }) {
+                    Text("Importer un bloc JSON")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PTSecondaryPillButtonStyle())
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 48)
+    }
+    
+    private func blocRow(for bloc: MacroBloc) -> some View {
+        let ratio = bloc.progressionRatio
+        let total = bloc.totalSeriesCount
+        let pct = Int(round(ratio * 100.0))
+        let isCompleted = total > 0 && ratio >= 1.0
+        let isActive = ratio > 0 && !isCompleted
+        
+        let statusText: String
+        let statusColor: Color
+        if isCompleted {
+            statusText = "Terminé · \(bloc.semaines.count) sem"
+            statusColor = PTTheme.success
+        } else if isActive, let semNum = bloc.activeSemaineNumero {
+            statusText = "En cours · S\(semNum)/\(max(1, bloc.semaines.count))"
+            statusColor = PTTheme.accent
+        } else {
+            statusText = "\(bloc.semaines.count) semaines"
+            statusColor = PTTheme.textSecondary
+        }
+        
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    PTKicker(text: statusText, color: statusColor)
+                    
+                    Text(bloc.nom)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(PTTheme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    
+                    if let refLine = referenceMaxLine(for: bloc) {
+                        Text(refLine)
+                            .font(.caption.monospacedDigit())
+                            .foregroundColor(PTTheme.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+                
+                Spacer(minLength: 8)
+                
+                HStack(spacing: 8) {
+                    Text("\(pct)%")
+                        .font(.system(size: 18, weight: .bold).monospacedDigit())
+                        .foregroundColor(isCompleted ? PTTheme.success : PTTheme.textPrimary)
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(PTTheme.textTertiary)
+                }
+            }
+            
+            PTProgressHairline(
+                ratio: ratio,
+                color: isCompleted ? PTTheme.success : PTTheme.accent
+            )
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .contentShape(Rectangle())
+    }
+    
+    private func referenceMaxLine(for bloc: MacroBloc) -> String? {
+        var parts: [String] = []
+        if bloc.squat1RM > 0 { parts.append("S \(PTFormat.weight(bloc.squat1RM))") }
+        if bloc.bench1RM > 0 { parts.append("B \(PTFormat.weight(bloc.bench1RM))") }
+        if bloc.deadlift1RM > 0 { parts.append("D \(PTFormat.weight(bloc.deadlift1RM))") }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: " · ") + " kg"
+    }
+    
     // MARK: - Actions SwiftData
     
     private func supprimerBloc(_ bloc: MacroBloc) {
@@ -189,7 +234,7 @@ struct BlocListView: View {
     }
 }
 
-// MARK: - Bannière Sobre de Reprise Rapide de Séance
+// MARK: - Bannière Flottante Style Flighty (Reprise de Séance)
 
 struct ResumeWorkoutBannerView: View {
     let seance: Seance
@@ -205,37 +250,39 @@ struct ResumeWorkoutBannerView: View {
     var body: some View {
         NavigationLink(destination: SeanceDetailView(seance: seance)) {
             HStack(spacing: 12) {
-                Image(systemName: "play.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.orange)
+                Circle()
+                    .fill(PTTheme.accent)
+                    .frame(width: 7, height: 7)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Reprendre la séance en cours")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+                    PTKicker(text: "Séance en cours", color: PTTheme.accent)
                     
-                    Text("\(nomSeance) • \(seance.validatedSeriesCount)/\(seance.totalSeriesCount) séries (\(pourcentage)%)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.secondary)
+                    Text("\(nomSeance) · \(seance.validatedSeriesCount)/\(seance.totalSeriesCount) (\(pourcentage)%)")
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundColor(PTTheme.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                 }
                 
-                Spacer()
+                Spacer(minLength: 6)
                 
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundColor(.secondary)
+                Image(systemName: "arrow.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(PTTheme.bg)
+                    .frame(width: 28, height: 28)
+                    .background(PTTheme.textPrimary)
+                    .clipShape(Circle())
             }
-            .padding(14)
-            .background(Color(white: 0.15))
-            .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.orange)
-                    .frame(width: 3)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.leading, 16)
+            .padding(.trailing, 10)
+            .padding(.vertical, 10)
+            .background(PTTheme.surfaceElevated)
+            .overlay(
+                Capsule()
+                    .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+            )
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.45), radius: 14, y: 6)
         }
         .buttonStyle(.plain)
         .simultaneousGesture(

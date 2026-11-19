@@ -20,211 +20,233 @@ struct ExportSettingsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    webhookCard
-                    authCard
+                VStack(alignment: .leading, spacing: 26) {
+                    webhookSection
+                    authSection
                     testAndStatusSection
-                    offlineQueueCard
+                    offlineQueueSection
                 }
-                .padding(16)
+                .padding(.vertical, 20)
             }
-            .background(Color.black.ignoresSafeArea())
+            .scrollDismissesKeyboard(.interactively)
+            .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Serveur Linux & Export")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fermer") {
                         dismiss()
                     }
-                    .foregroundColor(.orange)
+                    .foregroundColor(PTTheme.textSecondary)
                 }
             }
         }
     }
     
-    // MARK: - Cartes
+    // MARK: - Sections Éditoriales
     
-    private var webhookCard: some View {
+    private var webhookSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Webhook n8n (Serveur Linux)", systemImage: "server.rack")
-                .font(.headline)
-                .foregroundColor(.white)
+            PTKicker(text: "Webhook n8n (Serveur Linux)")
+                .padding(.horizontal, 16)
             
-            Text("Les séances validées et vos ressentis sont envoyés en JSON (v2) vers cette URL.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            TextField("https://n8n.exemple.fr/webhook/powertrack", text: $exportManager.webhookURL)
-                .keyboardType(.URL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .padding(12)
-                .background(Color(white: 0.17))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Les séances validées et vos ressentis sont envoyés en JSON (v2) vers cette URL.")
+                        .font(.caption)
+                        .foregroundColor(PTTheme.textSecondary)
+                    
+                    TextField("https://n8n.exemple.fr/webhook/powertrack", text: $exportManager.webhookURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.subheadline)
+                        .foregroundColor(PTTheme.textPrimary)
+                        .padding(12)
+                        .background(PTTheme.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                
+                PTHairline()
+            }
         }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
     
-    private var authCard: some View {
+    private var authSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Authentification (optionnel)", systemImage: "lock.shield")
-                .font(.headline)
-                .foregroundColor(.white)
+            PTKicker(text: "Authentification (optionnel)")
+                .padding(.horizontal, 16)
             
-            Text("Si ton webhook n8n vérifie un en-tête HTTP (Header Auth).")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            TextField("Nom du header (ex: X-API-Key)", text: $exportManager.authHeaderName)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .padding(12)
-                .background(Color(white: 0.17))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            
-            SecureField("Token / Clé secrète", text: $exportManager.authHeaderValue)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .padding(12)
-                .background(Color(white: 0.17))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Si ton webhook n8n vérifie un en-tête HTTP (Header Auth).")
+                        .font(.caption)
+                        .foregroundColor(PTTheme.textSecondary)
+                    
+                    TextField("Nom du header (ex: X-API-Key)", text: $exportManager.authHeaderName)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.subheadline)
+                        .foregroundColor(PTTheme.textPrimary)
+                        .padding(12)
+                        .background(PTTheme.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    
+                    SecureField("Token / Clé secrète", text: $exportManager.authHeaderValue)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.subheadline)
+                        .foregroundColor(PTTheme.textPrimary)
+                        .padding(12)
+                        .background(PTTheme.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                
+                PTHairline()
+            }
         }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
     
     private var testAndStatusSection: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Button(action: lancerTestConnexion) {
                 HStack(spacing: 8) {
                     if isTesting {
                         ProgressView()
-                            .tint(.black)
+                            .tint(PTTheme.bg)
                     } else {
                         Image(systemName: "bolt.horizontal.circle.fill")
                     }
                     Text(isTesting ? "Test en cours..." : "Tester la connexion (ping)")
-                        .font(.subheadline.weight(.semibold))
                 }
-                .foregroundColor(.black)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(exportManager.hasValidWebhookURL ? Color.orange : Color(white: 0.25))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PTPrimaryPillButtonStyle(isDisabled: !exportManager.hasValidWebhookURL || isTesting))
             .disabled(!exportManager.hasValidWebhookURL || isTesting)
             
             if let message = statusMessage {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: statusIsSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(statusIsSuccess ? .green : .orange)
+                        .foregroundColor(statusIsSuccess ? PTTheme.success : PTTheme.accent)
                     Text(message)
                         .font(.caption)
-                        .foregroundColor(.white)
+                        .foregroundColor(PTTheme.textPrimary)
                     Spacer()
                 }
                 .padding(12)
-                .background(Color(white: 0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(PTTheme.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(PTTheme.hairline, lineWidth: 0.5)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
+        .padding(.horizontal, 16)
     }
     
-    private var offlineQueueCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var offlineQueueSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("File d'attente hors-ligne", systemImage: "tray.full.fill")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
+                PTKicker(text: "File d'attente hors-ligne")
                 Spacer()
-                
                 Text("\(exportManager.pendingQueue.count)")
                     .font(.caption.weight(.bold).monospacedDigit())
-                    .foregroundColor(exportManager.pendingQueue.isEmpty ? .secondary : .black)
+                    .foregroundColor(exportManager.pendingQueue.isEmpty ? PTTheme.textSecondary : PTTheme.bg)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(exportManager.pendingQueue.isEmpty ? Color(white: 0.20) : Color.orange)
+                    .background(exportManager.pendingQueue.isEmpty ? PTTheme.surfaceElevated : PTTheme.accent)
                     .clipShape(Capsule())
             }
+            .padding(.horizontal, 16)
             
-            if exportManager.pendingQueue.isEmpty {
-                Text("Aucune séance en attente d'envoi.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(exportManager.pendingQueue) { item in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(item.titre)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundColor(.white)
-                        
-                        Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        
-                        if let err = item.lastError {
-                            Text(err)
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                                .lineLimit(2)
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                if exportManager.pendingQueue.isEmpty {
+                    Text("Aucune séance en attente d'envoi.")
+                        .font(.caption)
+                        .foregroundColor(PTTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                } else {
+                    ForEach(exportManager.pendingQueue) { item in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.titre)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(PTTheme.textPrimary)
+                            
+                            Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption2.monospacedDigit())
+                                .foregroundColor(PTTheme.textTertiary)
+                            
+                            if let err = item.lastError {
+                                Text(err)
+                                    .font(.caption2)
+                                    .foregroundColor(PTTheme.accent)
+                                    .lineLimit(2)
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        
+                        PTHairline(leadingInset: 16)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(Color(white: 0.16))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    
+                    HStack(spacing: 10) {
+                        Button(action: renvoyerFile) {
+                            HStack(spacing: 6) {
+                                if isFlushing {
+                                    ProgressView().tint(PTTheme.bg)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                }
+                                Text("Renvoyer tout")
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PTPrimaryPillButtonStyle(isDisabled: isFlushing || !exportManager.hasValidWebhookURL))
+                        .disabled(isFlushing || !exportManager.hasValidWebhookURL)
+                        
+                        Button(role: .destructive) {
+                            exportManager.clearPendingQueue()
+                        } label: {
+                            Text("Vider")
+                                .foregroundColor(PTTheme.danger)
+                        }
+                        .buttonStyle(PTSecondaryPillButtonStyle())
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                 }
                 
-                HStack(spacing: 10) {
-                    Button(action: renvoyerFile) {
-                        HStack(spacing: 6) {
-                            if isFlushing {
-                                ProgressView().tint(.black)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                            Text("Renvoyer tout")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.orange)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isFlushing || !exportManager.hasValidWebhookURL)
-                    
-                    Button(role: .destructive) {
-                        exportManager.clearPendingQueue()
-                    } label: {
-                        Text("Vider")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(Color(white: 0.18))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
+                PTHairline()
             }
         }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
     
     // MARK: - Actions

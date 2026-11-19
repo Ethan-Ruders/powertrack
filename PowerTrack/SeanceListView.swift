@@ -10,48 +10,92 @@ struct SeanceListView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            LazyVStack(spacing: 0) {
+                headerStrip
+                PTHairline()
+                
                 ForEach(seancesTriees) { seance in
                     NavigationLink(destination: SeanceDetailView(seance: seance)) {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(seance.titre ?? seance.date.formatted(date: .abbreviated, time: .omitted).capitalized)
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.85)
-                                
-                                HStack(spacing: 6) {
-                                    Text(seance.date.formatted(date: .abbreviated, time: .omitted))
-                                    Text("•")
-                                    Text("\(seance.exercices.count) exercices")
-                                    if seance.validatedSeriesCount > 0 {
-                                        Text("• \(seance.validatedSeriesCount)/\(seance.totalSeriesCount)")
-                                    }
-                                }
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundColor(.orange)
-                        }
-                        .padding(16)
-                        .background(Color(white: 0.11))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        seanceRow(for: seance)
                     }
                     .buttonStyle(.plain)
+                    
+                    PTHairline(leadingInset: 20)
                 }
             }
-            .padding(16)
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(PTTheme.bg.ignoresSafeArea())
         .navigationTitle(semaine.nom)
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
+    }
+    
+    // MARK: - Sous-vues Éditoriales
+    
+    private var headerStrip: some View {
+        let ratio = semaine.progressionRatio
+        let pct = Int(round(ratio * 100.0))
+        
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                PTKicker(text: "\(semaine.completedSeancesCount) / \(semaine.seances.count) séances terminées")
+                Spacer()
+                Text("\(pct)%")
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .foregroundColor(ratio >= 1.0 && semaine.totalSeriesCount > 0 ? PTTheme.success : PTTheme.textPrimary)
+            }
+            
+            PTProgressHairline(
+                ratio: ratio,
+                color: ratio >= 1.0 && semaine.totalSeriesCount > 0 ? PTTheme.success : PTTheme.accent
+            )
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+    }
+    
+    private func seanceRow(for seance: Seance) -> some View {
+        let validated = seance.validatedSeriesCount
+        let total = seance.totalSeriesCount
+        let isDone = total > 0 && validated == total
+        let isInProgress = validated > 0 && !isDone
+        
+        let statusColor: Color = isDone ? PTTheme.success : (isInProgress ? PTTheme.accent : PTTheme.textTertiary)
+        let dateLabel = seance.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+        
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                PTKicker(
+                    text: dateLabel,
+                    color: isInProgress ? PTTheme.accent : PTTheme.textSecondary
+                )
+                
+                Text(seance.titre ?? seance.date.formatted(date: .abbreviated, time: .omitted).capitalized)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(PTTheme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                
+                Text("\(seance.exercices.count) exercices · \(validated)/\(total) séries")
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(PTTheme.textSecondary)
+                    .lineLimit(1)
+            }
+            
+            Spacer(minLength: 6)
+            
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 7, height: 7)
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(PTTheme.textTertiary)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 15)
+        .contentShape(Rectangle())
     }
 }

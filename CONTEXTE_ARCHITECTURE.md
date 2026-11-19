@@ -8,7 +8,7 @@
 
 - **Objectif :** Application iOS native et sur-mesure de suivi de **force athlétique (Powerlifting)** pour usage personnel.
 - **Stack technique :**
-  - **UI :** SwiftUI (`preferredColorScheme(.dark)`, accent `.orange`, fond noir `#000000` / cartes `Color(white: 0.11)`), pensée pour une utilisation en salle avec téléphone souvent verrouillé.
+  - **UI :** SwiftUI (`preferredColorScheme(.dark)`), esthétique **Swiss Editorial / Flighty** centralisée dans `DesignSystem.swift` (`PTTheme`: fond encre profond `#09090B`, surfaces `#111114` / `#18181C`, filets `0.5pt`, texte primaire blanc craie `#F5F5F7`, accent cuivre mat `#DE7A42` utilisé avec parcimonie), pensée pour une utilisation en salle avec téléphone souvent verrouillé.
   - **Persistance locale :** SwiftData (`ModelContainer` sur `MacroBloc.self`) + `UserDefaults` pour l'état de séance en cours (`SeanceProgressTracker`). Fonctionnement **100 % hors-ligne** pendant l'entraînement.
   - **Graphiques :** Swift Charts (`PerformanceDashboardView`).
   - **Arrière-plan & Écran verrouillé :** `ActivityKit`, `WidgetKit`, `AppIntents`, `UserNotifications`, `AVFoundation` / `AudioToolbox` (ducking audio non-intrusif) et `UIKit` haptique.
@@ -25,6 +25,7 @@ Le projet utilise `PBXFileSystemSynchronizedRootGroup` dans `PowerTrack.xcodepro
 
 - **Cible `PowerTrack`** (`com.ethanruders.PowerTrack`, `IPHONEOS_DEPLOYMENT_TARGET = 26.5`, Swift 5.0, aucune dépendance SwiftPM externe) :
   - `PowerTrackApp.swift` — Point d'entrée `@main`, configure `.modelContainer(for: MacroBloc.self)`.
+  - `DesignSystem.swift` — Palette `PTTheme` (`#09090B` / `#F5F5F7` / `#DE7A42`), primitives éditoriales (`PTHairline`, `PTKicker`, `PTProgressHairline`), boutons capsule (`PTPrimaryPillButtonStyle`, `PTSecondaryPillButtonStyle`), formatage (`PTFormat`) et calculateur de disques (`PTBarbellPlateHelper`).
   - `ContentView.swift` — `TabView` à 2 onglets : **Programmation** (`BlocListView`) et **Performance** (`PerformanceDashboardView`).
   - `models.swift` — Modèles SwiftData (`MacroBloc`, `Semaine`, `Seance`, `Exercice`, `Serie`), énumérations (`CategorieExercice`, `TypeEchauffementExercice`), état local `SeanceProgressTracker`, et moteur de charges RPE (`pourcentagePour`, `calculerCharge`).
   - `BlocListView.swift` — Liste des blocs, menu de création / import JSON coach, accès aux réglages serveur (badge file hors-ligne), suppression par menu contextuel, et bannière flottante `ResumeWorkoutBannerView`.
@@ -42,7 +43,7 @@ Le projet utilise `PBXFileSystemSynchronizedRootGroup` dans `PowerTrack.xcodepro
   - `RestTimerAttributes.swift` — Définition `ActivityAttributes` pour la Live Activity côté app.
   - `RestTimerActivityManager.swift` — Gestionnaire `@MainActor` (`LiveActivityManager` aliasé) pour démarrer, prolonger (`+30s`), clôturer automatiquement la Live Activity et planifier la notification de fin de repos.
   - `RestTimerAppIntents.swift` — `AjouterTempsIntent` et `PasserReposIntent` côté app.
-  - `PerformanceDashboardView.swift` — Onglet Performance avec cartes records e1RM (Squat/Bench/Deadlift), graphique Catmull-Rom d'évolution e1RM, tonnage hebdomadaire empilé par catégorie (`Compétition`, `Variante`, `Accessoire`), et cartes RPE moyen hebdomadaire.
+  - `PerformanceDashboardView.swift` — Onglet Performance avec sélecteur multi-blocs (`selectedBlocID`), Total SBD estimé + répartition proportionnelle, graphique `AreaMark`/`LineMark` d'évolution e1RM (calcul via `Serie.calculerE1RM()`), tonnage hebdomadaire empilé par catégorie (`Compétition`, `Variante`, `Accessoire`), et bandeau RPE moyen hebdomadaire.
   - `SeanceExportDTO.swift`, `SeanceExportSheet.swift` & `ExportSettingsView.swift` — Contrat JSON v2 (`SeanceExportDTO` avec cibles vs réel, durée réelle, `seanceId` idempotent, `RessentiSeanceDTO`), configuration webhook `n8n` + auth header, file d'attente hors-ligne, et copie/partage JSON local.
 
 - **Cible `PowerTrackWidgetsExtension`** (`com.ethanruders.PowerTrack.PowerTrackWidgets`, `IPHONEOS_DEPLOYMENT_TARGET = 27.0`, `NSSupportsLiveActivities = YES`) :
@@ -111,18 +112,19 @@ Ces points ont été observés directement dans le code actuel et constituent d'
 2. **Désynchronisation Live Activity (`+30s` / `Passer`) ↔ `TimerManager` :**
    - `RestTimerAttributes` et les `AppIntent` sont dupliqués entre `PowerTrack/` et `PowerTrackWidgets/`.
    - Cliquer sur `+30s` ou `Passer` depuis l'écran verrouillé (`WidgetAjouterTempsIntent` / `WidgetPasserReposIntent`) met à jour ou ferme la Live Activity, mais ne met pas à jour les notifications locales `UNUserNotificationCenter` ni l'état `TimerManager` lorsque l'app repasse au premier plan (et inversement, à vérifier lors d'un `ajouterTemps` ou `stopTimer`).
-3. **Multi-blocs dans `PerformanceDashboardView.swift` :**
-   - `donneesTonnageHebdo()` (ligne 331) et `rpeMoyenParSemaine()` (ligne 379) lisent uniquement `blocs.first` au lieu de permettre de choisir un `MacroBloc` (ou d'agréger).
-   - Le calcul d'e1RM dans `pointsE1RMPourMouvement()` duplique la formule déjà présente dans `Serie.calculerE1RM()`.
+3. **Multi-blocs dans `PerformanceDashboardView.swift` (résolu) :**
+   - Résolu : filtre multi-blocs (`selectedBlocID: PersistentIdentifier?`, tri `@Query` par `dateDebut` décroissant) et déduplication du calcul e1RM via `Serie.calculerE1RM()`.
 4. **Cohérence des Deployment Targets :**
    - `PowerTrack` cible iOS `26.5` alors que `PowerTrackWidgetsExtension` cible `27.0` dans `project.pbxproj`. À aligner si besoin.
 5. **Tests automatisés :**
    - Aucune cible `XCTest` / `Swift Testing` n'existe encore dans le projet (utile pour tester `ProgramGenerator`, `ProgramJSONImporter`, `calculerE1RM`, `calculerCharge`, `genererPaliersEchauffement`, et `SeanceExportDTO`).
+6. **Cockpit Web Coach sur `Serveur-Linux` (piste future, après prise en main quotidienne) :**
+   - Éventuelle mini web app Docker (`FastAPI` + front sombre/orange façon PowerTrack derrière `nginx-proxy-manager`) affichant les métriques/alertes depuis `postgres-force` + chat coach relié à une API LLM et aux scripts du repo `powerlifting-coach-skill` (avec historique des messages en BDD et export JSON direct vers `ProgramImportSheet`).
 
 ---
 
 ## 6. Rappels pour la Prochaine Conversation
 
-- Toujours garder l'app **100 % fonctionnelle hors-ligne** pendant les séances et préserver le style **sombre minimaliste + orange**.
+- Toujours garder l'app **100 % fonctionnelle hors-ligne** pendant les séances et préserver le style **Swiss Editorial / Flighty (`#09090B` + `#F5F5F7` + `#DE7A42`)** via `DesignSystem.swift`.
 - Pour toute modification de `PowerTrack.xcodeproj` ou ajout de fichiers, vérifier la compatibilité avec le build CI sans signature (`CODE_SIGNING_ALLOWED=NO` sur `xcode-27`) et **ne pas ajouter de nouvelle App Extension** (quota de 3 App IDs déjà plein avec `PowerTrack` + `PowerTrackWidgets` + `SideStore`).
 - Si un nouveau `.md` de documentation est modifié dans le repo, vérifier `paths-ignore` dans `.github/workflows/build-ipa.yml` pour éviter de déclencher des builds `.ipa` inutiles.

@@ -13,21 +13,21 @@ struct TimerView: View {
     var body: some View {
         if timerManager.state != .inactive {
             HStack(spacing: 12) {
-                Image(systemName: "timer")
-                    .font(.headline)
-                    .foregroundColor(couleurChrono)
-                
-                Text("Repos")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+                Circle()
+                    .fill(couleurChrono)
+                    .frame(width: 8, height: 8)
                 
                 Text(formatTime(timerManager.tempsEcoule))
-                    .font(.headline.monospacedDigit())
+                    .font(.system(size: 19, weight: .bold).monospacedDigit())
                     .foregroundColor(couleurChrono)
                     .lineLimit(1)
                 
-                Spacer()
+                Text("Repos")
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(PTTheme.textSecondary)
+                    .lineLimit(1)
+                
+                Spacer(minLength: 6)
                 
                 Button(action: {
                     HapticAndSoundManager.shared.triggerLightImpact()
@@ -35,11 +35,15 @@ struct TimerView: View {
                 }) {
                     Text("+30s")
                         .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color(white: 0.22))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .foregroundColor(PTTheme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(PTTheme.surface)
+                        .overlay(
+                            Capsule()
+                                .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+                        )
+                        .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 
@@ -49,20 +53,28 @@ struct TimerView: View {
                         timerManager.stopTimer()
                     }
                 }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                        .frame(width: 32, height: 32)
-                        .contentShape(Circle())
+                    Text("Passer")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(PTTheme.bg)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 7)
+                        .background(PTTheme.textPrimary)
+                        .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.leading, 16)
+            .padding(.trailing, 10)
+            .padding(.vertical, 9)
+            .background(PTTheme.surfaceElevated)
+            .overlay(
+                Capsule()
+                    .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+            )
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.45), radius: 14, y: 6)
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color(white: 0.15))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            .padding(.bottom, 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
@@ -75,11 +87,11 @@ struct TimerView: View {
     
     private var couleurChrono: Color {
         if timerManager.maxAlertDuration > 0 && timerManager.tempsEcoule >= timerManager.maxAlertDuration {
-            return .red
+            return PTTheme.danger
         } else if timerManager.minAlertDuration > 0 && timerManager.tempsEcoule >= timerManager.minAlertDuration {
-            return .green
+            return PTTheme.success
         } else {
-            return .white
+            return PTTheme.textPrimary
         }
     }
 }

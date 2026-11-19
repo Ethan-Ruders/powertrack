@@ -14,7 +14,7 @@ struct ContentView: View {
                     Label("Performance", systemImage: "chart.line.uptrend.xyaxis")
                 }
         }
-        .tint(.orange)
+        .tint(PTTheme.accent)
         .preferredColorScheme(.dark)
     }
 }

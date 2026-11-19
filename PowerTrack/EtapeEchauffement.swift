@@ -145,128 +145,139 @@ struct EchauffementSheetView: View {
         genererPaliersEchauffement(pour: exercice, chargeCibleOverride: poidsVise)
     }
     
+    private var platesBreakdown: String? {
+        guard let w = poidsVise, w > 20.0, exercice.estSBDOuVariante else { return nil }
+        return PTBarbellPlateHelper.formattedPlatesPerSide(totalKg: w)
+    }
+    
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // En-tête récapitulatif du Top Set visé
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Objectif Top Set (\(exercice.repsCiblesTopSet) \(exercice.repsCiblesTopSet > 1 ? "reps" : "rep"))")
-                                .font(.caption.weight(.medium))
-                                .foregroundColor(.secondary)
-                            
-                            Text(exercice.estSBDOuVariante ? "Montée SBD spécifique" : "Acclimatation polyarticulaire")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.white)
-                        }
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    // En-tête éditorial : Charge cible + décomposition des disques
+                    VStack(alignment: .leading, spacing: 10) {
+                        PTKicker(text: "Charge cible · \(exercice.repsCiblesTopSet) \(exercice.repsCiblesTopSet > 1 ? "reps" : "rep")")
                         
-                        Spacer()
-                        
-                        // Champ compact de charge cible (pré-rempli depuis la 1ère série)
-                        HStack(spacing: 4) {
-                            TextField("Charge", value: $poidsVise, format: .number)
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            TextField("0", value: $poidsVise, format: .number)
                                 .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .font(.headline.weight(.bold).monospacedDigit())
-                                .foregroundColor(.orange)
-                                .frame(width: 64)
+                                .font(.system(size: 32, weight: .bold).monospacedDigit())
+                                .foregroundColor(PTTheme.textPrimary)
+                                .frame(maxWidth: 120, alignment: .leading)
                             
                             Text("kg")
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundColor(.secondary)
+                                .font(.headline.weight(.medium))
+                                .foregroundColor(PTTheme.textSecondary)
+                            
+                            Spacer()
+                            
+                            Text(exercice.estSBDOuVariante ? "Montée SBD" : "Acclimatation")
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(PTTheme.textSecondary)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color(white: 0.16))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                    .padding(16)
-                    .background(Color(white: 0.11))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    
-                    // Liste des paliers générés avec cases à cocher
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Paliers d'échauffement")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 4)
                         
-                        VStack(spacing: 0) {
-                            ForEach(Array(paliers.enumerated()), id: \.element.id) { index, palier in
-                                let estCoche = paliersCoches.contains(palier.id)
-                                
-                                Button(action: {
-                                    HapticAndSoundManager.shared.triggerSelection()
-                                    withAnimation(.snappy(duration: 0.2)) {
-                                        if estCoche {
-                                            paliersCoches.remove(palier.id)
-                                        } else {
-                                            paliersCoches.insert(palier.id)
-                                        }
+                        if let plates = platesBreakdown {
+                            Text("Barre 20 kg · \(plates)")
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundColor(PTTheme.accent)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 18)
+                    
+                    PTHairline()
+                    
+                    // Paliers générés en liste bord-à-bord
+                    VStack(alignment: .leading, spacing: 0) {
+                        PTKicker(text: "Paliers d'échauffement")
+                            .padding(.horizontal, 20)
+                            .padding(.top, 18)
+                            .padding(.bottom, 10)
+                        
+                        PTHairline()
+                        
+                        ForEach(Array(paliers.enumerated()), id: \.element.id) { index, palier in
+                            let estCoche = paliersCoches.contains(palier.id)
+                            
+                            Button(action: {
+                                HapticAndSoundManager.shared.triggerSelection()
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    if estCoche {
+                                        paliersCoches.remove(palier.id)
+                                    } else {
+                                        paliersCoches.insert(palier.id)
                                     }
-                                }) {
-                                    HStack(spacing: 12) {
-                                        // Numéro du palier & pourcentage
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Palier \(palier.numeroPalier) • \(palier.labelPourcentage)")
-                                                .font(.subheadline.weight(.semibold).monospacedDigit())
-                                                .foregroundColor(estCoche ? .secondary : .white)
-                                                .strikethrough(estCoche, color: .secondary)
-                                                .lineLimit(1)
-                                            
-                                            Text(palier.roleDescription)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                                .lineLimit(1)
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        // Format exact : Charge kg × Reps
-                                        Text(palier.formatChargeReps)
-                                            .font(.subheadline.weight(.bold).monospacedDigit())
-                                            .foregroundColor(estCoche ? .secondary : .orange)
-                                            .strikethrough(estCoche, color: .secondary)
+                                }
+                            }) {
+                                HStack(spacing: 12) {
+                                    Text(String(format: "%02d", palier.numeroPalier))
+                                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                        .foregroundColor(estCoche ? PTTheme.textTertiary : PTTheme.accent)
+                                        .frame(width: 24, alignment: .leading)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(palier.labelPourcentage)
+                                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                                            .foregroundColor(PTTheme.textPrimary)
+                                            .strikethrough(estCoche, color: PTTheme.textSecondary)
                                             .lineLimit(1)
                                         
-                                        // Case à cocher simple
-                                        Image(systemName: estCoche ? "checkmark.circle.fill" : "circle")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 24, height: 24)
-                                            .foregroundColor(estCoche ? .green : Color(white: 0.35))
+                                        Text(palier.roleDescription)
+                                            .font(.caption)
+                                            .foregroundColor(PTTheme.textSecondary)
+                                            .lineLimit(1)
                                     }
-                                    .padding(.horizontal, 16)
-                                    .frame(minHeight: 54)
-                                    .contentShape(Rectangle())
-                                    .opacity(estCoche ? 0.55 : 1.0)
+                                    
+                                    Spacer(minLength: 6)
+                                    
+                                    Text(palier.formatChargeReps)
+                                        .font(.subheadline.weight(.bold).monospacedDigit())
+                                        .foregroundColor(estCoche ? PTTheme.textSecondary : PTTheme.textPrimary)
+                                        .strikethrough(estCoche, color: PTTheme.textSecondary)
+                                        .lineLimit(1)
+                                    
+                                    ZStack {
+                                        if estCoche {
+                                            Circle()
+                                                .fill(PTTheme.textPrimary)
+                                                .frame(width: 24, height: 24)
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(PTTheme.bg)
+                                        } else {
+                                            Circle()
+                                                .stroke(PTTheme.textTertiary, lineWidth: 1.5)
+                                                .frame(width: 24, height: 24)
+                                        }
+                                    }
                                 }
-                                .buttonStyle(.plain)
-                                
-                                if index < paliers.count - 1 {
-                                    Divider()
-                                        .background(Color.white.opacity(0.08))
-                                        .padding(.leading, 16)
-                                }
+                                .padding(.horizontal, 20)
+                                .frame(minHeight: 58)
+                                .contentShape(Rectangle())
+                                .opacity(estCoche ? 0.48 : 1.0)
+                            }
+                            .buttonStyle(.plain)
+                            
+                            if index < paliers.count - 1 {
+                                PTHairline(leadingInset: 20)
+                            } else {
+                                PTHairline()
                             }
                         }
-                        .background(Color(white: 0.11))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                 }
-                .padding(16)
+                .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Color.black.ignoresSafeArea())
-            .navigationTitle("Échauffement • \(exercice.nom)")
+            .background(PTTheme.bg.ignoresSafeArea())
+            .navigationTitle(exercice.nom)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fermer") {
                         dismiss()
                     }
-                    .foregroundColor(.orange)
+                    .foregroundColor(PTTheme.textPrimary)
                     .fontWeight(.semibold)
                 }
             }

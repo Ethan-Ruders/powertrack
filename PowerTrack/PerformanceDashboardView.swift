@@ -31,138 +31,314 @@ struct TonnageHebdoPoint: Identifiable {
 }
 
 struct PerformanceDashboardView: View {
-    @Query private var blocs: [MacroBloc]
+    @Query(sort: \MacroBloc.dateDebut, order: .reverse) private var blocs: [MacroBloc]
     
     @State private var mouvementSelectionne: MouvementCompetition = .bench
+    @State private var selectedBlocID: PersistentIdentifier? = nil
+    
+    private var selectedBloc: MacroBloc? {
+        guard let selectedBlocID else { return nil }
+        return blocs.first(where: { $0.persistentModelID == selectedBlocID })
+    }
+    
+    private var scopedBlocs: [MacroBloc] {
+        if let selectedBloc {
+            return [selectedBloc]
+        }
+        return blocs
+    }
+    
+    private var weeklyBloc: MacroBloc? {
+        selectedBloc ?? blocs.first
+    }
     
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    topRecordsSection
+                VStack(alignment: .leading, spacing: 28) {
+                    if blocs.count > 1 {
+                        blocFilterStrip
+                    }
+                    
+                    totalAndRecordsSection
                     e1rmEvolutionSection
                     tonnageHebdoSection
                     rpeMoyenHebdoSection
                 }
-                .padding(16)
+                .padding(.vertical, 16)
             }
-            .background(Color.black.ignoresSafeArea())
+            .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Performance")
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .preferredColorScheme(.dark)
         }
     }
     
-    // MARK: - Cartes Records du Moment
+    // MARK: - Filtre Multi-Bloc
     
-    private var topRecordsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Records Estimés (e1RM)")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            HStack(spacing: 10) {
-                recordCard(mouvement: .squat)
-                recordCard(mouvement: .bench)
-                recordCard(mouvement: .deadlift)
-            }
-        }
-    }
-    
-    private func recordCard(mouvement: MouvementCompetition) -> some View {
-        let maxE1rm = meilleurE1RMPourMouvement(mouvement)
-        return VStack(alignment: .leading, spacing: 6) {
-            Text(mouvement.rawValue)
-                .font(.caption.weight(.medium))
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            
-            Text(maxE1rm > 0 ? "\(Int(maxE1rm)) kg" : "-")
-                .font(.title3.weight(.bold).monospacedDigit())
-                .foregroundColor(maxE1rm > 0 ? .white : .secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-    
-    // MARK: - Section A : Graphique e1RM
-    
-    private var e1rmEvolutionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Progression e1RM")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            Picker("Mouvement", selection: $mouvementSelectionne) {
-                ForEach(MouvementCompetition.allCases) { m in
-                    Text(m.rawValue).tag(m)
+    private var blocFilterStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                blocFilterPill(title: "Tous les blocs", isSelected: selectedBloc == nil) {
+                    selectedBlocID = nil
                 }
-            }
-            .pickerStyle(.segmented)
-            
-            let points = pointsE1RMPourMouvement(mouvementSelectionne)
-            
-            if points.isEmpty {
-                VStack(spacing: 6) {
-                    Text("Aucune série validée pour \(mouvementSelectionne.rawValue)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 160)
-                .background(Color(white: 0.11))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            } else {
-                Chart {
-                    ForEach(points) { point in
-                        LineMark(
-                            x: .value("Date", point.date, unit: .day),
-                            y: .value("e1RM (kg)", point.e1rm)
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(Color.orange)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5))
-                        
-                        PointMark(
-                            x: .value("Date", point.date, unit: .day),
-                            y: .value("e1RM (kg)", point.e1rm)
-                        )
-                        .foregroundStyle(Color.orange)
-                        .symbolSize(40)
-                        .annotation(position: .top) {
-                            Text("\(Int(point.e1rm))")
-                                .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                                .foregroundColor(.secondary)
-                        }
+                
+                ForEach(blocs) { bloc in
+                    let isSelected = selectedBloc?.persistentModelID == bloc.persistentModelID
+                    blocFilterPill(title: bloc.nom, isSelected: isSelected) {
+                        selectedBlocID = bloc.persistentModelID
                     }
                 }
-                .chartYAxis {
-                    AxisMarks(position: .leading) { val in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.white.opacity(0.08))
-                        AxisValueLabel {
-                            if let v = val.as(Double.self) {
-                                Text("\(Int(v)) kg")
-                                    .font(.caption2.monospacedDigit())
-                                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+    
+    private func blocFilterPill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(isSelected ? .bold : .medium))
+                .foregroundColor(isSelected ? PTTheme.bg : PTTheme.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(isSelected ? PTTheme.textPrimary : PTTheme.surface)
+                .overlay(
+                    Capsule()
+                        .stroke(isSelected ? Color.clear : PTTheme.hairline, lineWidth: 0.5)
+                )
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+    
+    // MARK: - Hero Total Estimé & Records SBD
+    
+    private var totalAndRecordsSection: some View {
+        let squatBest = meilleurE1RMPourMouvement(.squat)
+        let benchBest = meilleurE1RMPourMouvement(.bench)
+        let deadliftBest = meilleurE1RMPourMouvement(.deadlift)
+        let total = squatBest + benchBest + deadliftBest
+        
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    PTKicker(text: "Total SBD Estimé · e1RM", color: PTTheme.accent)
+                    Spacer()
+                    PTKicker(text: selectedBloc?.nom ?? "Global")
+                }
+                
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(total > 0 ? PTFormat.weight(total) : "—")
+                        .font(.system(size: 40, weight: .bold).monospacedDigit())
+                        .foregroundColor(total > 0 ? PTTheme.textPrimary : PTTheme.textTertiary)
+                    
+                    if total > 0 {
+                        Text("kg")
+                            .font(.title3.weight(.semibold))
+                            .foregroundColor(PTTheme.textSecondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            
+            if total > 0 {
+                proportionalSBDBar(squat: squatBest, bench: benchBest, deadlift: deadliftBest, total: total)
+                    .padding(.horizontal, 16)
+            }
+            
+            VStack(spacing: 0) {
+                PTHairline()
+                HStack(spacing: 0) {
+                    recordColumn(mouvement: .squat, value: squatBest, total: total, dotColor: PTTheme.textPrimary)
+                    verticalHairline
+                    recordColumn(mouvement: .bench, value: benchBest, total: total, dotColor: PTTheme.accent)
+                    verticalHairline
+                    recordColumn(mouvement: .deadlift, value: deadliftBest, total: total, dotColor: PTTheme.textSecondary)
+                }
+                PTHairline()
+            }
+        }
+    }
+    
+    private func proportionalSBDBar(squat: Double, bench: Double, deadlift: Double, total: Double) -> some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let sqW = max(0, w * (squat / total))
+            let bnW = max(0, w * (bench / total))
+            let dlW = max(0, w * (deadlift / total))
+            
+            HStack(spacing: 2) {
+                if sqW > 0 {
+                    Rectangle()
+                        .fill(PTTheme.textPrimary)
+                        .frame(width: sqW)
+                }
+                if bnW > 0 {
+                    Rectangle()
+                        .fill(PTTheme.accent)
+                        .frame(width: bnW)
+                }
+                if dlW > 0 {
+                    Rectangle()
+                        .fill(PTTheme.textSecondary)
+                        .frame(width: dlW)
+                }
+            }
+        }
+        .frame(height: 3)
+        .background(PTTheme.hairline)
+    }
+    
+    private func recordColumn(mouvement: MouvementCompetition, value: Double, total: Double, dotColor: Color) -> some View {
+        let share = total > 0 && value > 0 ? Int(round((value / total) * 100.0)) : 0
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(dotColor)
+                    .frame(width: 5, height: 5)
+                PTKicker(text: mouvement.rawValue)
+            }
+            
+            Text(value > 0 ? "\(PTFormat.weight(value)) kg" : "—")
+                .font(.title3.weight(.bold).monospacedDigit())
+                .foregroundColor(value > 0 ? PTTheme.textPrimary : PTTheme.textTertiary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            
+            Text(share > 0 ? "\(share)% du total" : "Aucune donnée")
+                .font(.system(size: 11).monospacedDigit())
+                .foregroundColor(PTTheme.textTertiary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+    
+    private var verticalHairline: some View {
+        Rectangle()
+            .fill(PTTheme.hairline)
+            .frame(width: 0.5)
+    }
+    
+    // MARK: - Section A : Progression e1RM
+    
+    private var e1rmEvolutionSection: some View {
+        let points = pointsE1RMPourMouvement(mouvementSelectionne)
+        let minVal = points.map(\.e1rm).min() ?? 0
+        let maxVal = points.map(\.e1rm).max() ?? 100
+        let domainMin = max(0, minVal - 10)
+        let domainMax = max(domainMin + 10, maxVal + 10)
+        
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                PTKicker(text: "Progression e1RM")
+                Spacer()
+                if let latest = points.last {
+                    Text("Dernier · \(PTFormat.weight(latest.e1rm)) kg")
+                        .font(.caption.weight(.medium).monospacedDigit())
+                        .foregroundColor(PTTheme.textSecondary)
+                }
+            }
+            .padding(.horizontal, 16)
+            
+            HStack(spacing: 8) {
+                ForEach(MouvementCompetition.allCases) { m in
+                    let isSelected = mouvementSelectionne == m
+                    Button {
+                        mouvementSelectionne = m
+                    } label: {
+                        Text(m.rawValue)
+                            .font(.caption.weight(isSelected ? .bold : .medium))
+                            .foregroundColor(isSelected ? PTTheme.bg : PTTheme.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(isSelected ? PTTheme.textPrimary : PTTheme.surface)
+                            .overlay(
+                                Capsule()
+                                    .stroke(isSelected ? Color.clear : PTTheme.hairline, lineWidth: 0.5)
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                if points.isEmpty {
+                    Text("Aucune série validée pour \(mouvementSelectionne.rawValue)")
+                        .font(.subheadline)
+                        .foregroundColor(PTTheme.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 170)
+                        .padding(.horizontal, 16)
+                } else {
+                    Chart {
+                        ForEach(points) { point in
+                            AreaMark(
+                                x: .value("Date", point.date, unit: .day),
+                                yStart: .value("Base", domainMin),
+                                yEnd: .value("e1RM (kg)", point.e1rm)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [PTTheme.accent.opacity(0.24), PTTheme.accent.opacity(0.0)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            
+                            LineMark(
+                                x: .value("Date", point.date, unit: .day),
+                                y: .value("e1RM (kg)", point.e1rm)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(PTTheme.accent)
+                            .lineStyle(StrokeStyle(lineWidth: 2))
+                            
+                            PointMark(
+                                x: .value("Date", point.date, unit: .day),
+                                y: .value("e1RM (kg)", point.e1rm)
+                            )
+                            .foregroundStyle(PTTheme.accent)
+                            .symbolSize(30)
+                            .annotation(position: .top) {
+                                Text(PTFormat.weight(point.e1rm))
+                                    .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                                    .foregroundColor(PTTheme.textSecondary)
                             }
                         }
                     }
-                }
-                .chartXAxis {
-                    AxisMarks(values: .stride(by: .day, count: 7)) { _ in
-                        AxisValueLabel(format: .dateTime.day().month())
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(Color.secondary)
+                    .chartYScale(domain: domainMin...domainMax)
+                    .chartYAxis {
+                        AxisMarks(position: .leading) { val in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                                .foregroundStyle(PTTheme.hairline)
+                            AxisValueLabel {
+                                if let v = val.as(Double.self) {
+                                    Text("\(Int(v))")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundColor(PTTheme.textTertiary)
+                                }
+                            }
+                        }
                     }
+                    .chartXAxis {
+                        AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                            AxisValueLabel(format: .dateTime.day().month())
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(PTTheme.textTertiary)
+                        }
+                    }
+                    .frame(height: 190)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
                 }
-                .frame(height: 190)
-                .padding(16)
-                .background(Color(white: 0.11))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                
+                PTHairline()
             }
         }
     }
@@ -170,53 +346,72 @@ struct PerformanceDashboardView: View {
     // MARK: - Section B : Tonnage Hebdomadaire
     
     private var tonnageHebdoSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Tonnage Hebdomadaire")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            let tonnageData = donneesTonnageHebdo()
-            
-            if tonnageData.isEmpty {
-                Text("Aucune donnée de tonnage disponible.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 110)
-                    .background(Color(white: 0.11))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            } else {
-                Chart {
-                    ForEach(tonnageData) { point in
-                        BarMark(
-                            x: .value("Semaine", "S\(point.semaineNumero)"),
-                            y: .value("Tonnage (kg)", point.tonnageKg)
-                        )
-                        .foregroundStyle(by: .value("Catégorie", point.categorie))
-                        .cornerRadius(4)
-                    }
+        let tonnageData = donneesTonnageHebdo()
+        
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                PTKicker(text: "Tonnage Hebdomadaire")
+                Spacer()
+                if let bloc = weeklyBloc {
+                    PTKicker(text: bloc.nom, color: PTTheme.textTertiary)
                 }
-                .chartForegroundStyleScale([
-                    "Compétition": Color.orange,
-                    "Variante": Color(white: 0.45),
-                    "Accessoire": Color(white: 0.28)
-                ])
-                .chartYAxis {
-                    AxisMarks(position: .leading) { val in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.white.opacity(0.08))
-                        AxisValueLabel {
-                            if let v = val.as(Double.self) {
-                                Text(String(format: "%.1f t", v / 1000.0))
-                                    .font(.caption2.monospacedDigit())
-                                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                if tonnageData.isEmpty {
+                    Text("Aucune donnée de tonnage disponible.")
+                        .font(.subheadline)
+                        .foregroundColor(PTTheme.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                        .padding(.horizontal, 16)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Chart {
+                            ForEach(tonnageData) { point in
+                                BarMark(
+                                    x: .value("Semaine", "S\(point.semaineNumero)"),
+                                    y: .value("Tonnage (kg)", point.tonnageKg)
+                                )
+                                .foregroundStyle(by: .value("Catégorie", point.categorie))
+                                .cornerRadius(3)
                             }
                         }
+                        .chartForegroundStyleScale([
+                            "Compétition": PTTheme.accent,
+                            "Variante": PTTheme.textSecondary,
+                            "Accessoire": PTTheme.surfaceElevated
+                        ])
+                        .chartLegend(position: .bottom, alignment: .leading, spacing: 12)
+                        .chartYAxis {
+                            AxisMarks(position: .leading) { val in
+                                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                                    .foregroundStyle(PTTheme.hairline)
+                                AxisValueLabel {
+                                    if let v = val.as(Double.self) {
+                                        Text(String(format: "%.1f t", v / 1000.0))
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundColor(PTTheme.textTertiary)
+                                    }
+                                }
+                            }
+                        }
+                        .chartXAxis {
+                            AxisMarks { _ in
+                                AxisValueLabel()
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(PTTheme.textTertiary)
+                            }
+                        }
+                        .frame(height: 180)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
                 }
-                .frame(height: 180)
-                .padding(16)
-                .background(Color(white: 0.11))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                
+                PTHairline()
             }
         }
     }
@@ -227,33 +422,46 @@ struct PerformanceDashboardView: View {
         let pointsRPE = rpeMoyenParSemaine()
         return Group {
             if !pointsRPE.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("RPE Moyen par Semaine")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    
-                    HStack(spacing: 10) {
-                        ForEach(pointsRPE, id: \.semaine) { item in
-                            VStack(spacing: 4) {
-                                Text("S\(item.semaine)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                                
-                                Text(item.rpeMoyen > 0 ? String(format: "%.1f", item.rpeMoyen) : "-")
-                                    .font(.headline.weight(.bold).monospacedDigit())
-                                    .foregroundColor(item.rpeMoyen > 0 ? .white : .secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color(white: 0.15))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .firstTextBaseline) {
+                        PTKicker(text: "RPE Moyen par Semaine")
+                        Spacer()
+                        if let bloc = weeklyBloc {
+                            PTKicker(text: bloc.nom, color: PTTheme.textTertiary)
                         }
                     }
-                    .padding(16)
-                    .background(Color(white: 0.11))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .padding(.horizontal, 16)
+                    
+                    VStack(spacing: 0) {
+                        PTHairline()
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 0) {
+                                ForEach(Array(pointsRPE.enumerated()), id: \.element.semaine) { idx, item in
+                                    VStack(spacing: 4) {
+                                        PTKicker(text: String(format: "S%02d", item.semaine))
+                                        
+                                        Text(item.rpeMoyen > 0 ? String(format: "%.1f", item.rpeMoyen) : "—")
+                                            .font(.title3.weight(.bold).monospacedDigit())
+                                            .foregroundColor(item.rpeMoyen > 0 ? (item.rpeMoyen >= 9.0 ? PTTheme.accent : PTTheme.textPrimary) : PTTheme.textTertiary)
+                                            .lineLimit(1)
+                                    }
+                                    .frame(minWidth: 74, maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .padding(.horizontal, 10)
+                                    
+                                    if idx < pointsRPE.count - 1 {
+                                        verticalHairline
+                                    }
+                                }
+                            }
+                            .containerRelativeFrame(.horizontal) { width, _ in
+                                max(width, CGFloat(pointsRPE.count) * 74)
+                            }
+                        }
+                        
+                        PTHairline()
+                    }
                 }
             }
         }
@@ -265,19 +473,16 @@ struct PerformanceDashboardView: View {
         var pointsParDate: [Date: E1RMPoint] = [:]
         let calendar = Calendar.current
         
-        for bloc in blocs {
+        for bloc in scopedBlocs {
             for semaine in bloc.semaines {
                 for seance in semaine.seances {
                     let jour = calendar.startOfDay(for: seance.date)
                     for ex in seance.exercices where correspondAuMouvement(nom: ex.nom, mouv: mouvement) {
                         for serie in ex.series where serie.estValidee {
-                            guard let charge = serie.chargeSaisie, charge > 0 else { continue }
+                            guard let charge = serie.chargeSaisie, charge > 0,
+                                  let e1rm = serie.calculerE1RM() else { continue }
                             let reps = serie.repsCibles
                             let rpe = serie.rpeSaisi ?? serie.rpeCible
-                            
-                            let repsALechecTheorique = Double(reps) + max(0, 10.0 - rpe)
-                            let e1rmBrut = charge * (1.0 + repsALechecTheorique / 30.0)
-                            let e1rm = round(e1rmBrut / 2.5) * 2.5
                             
                             if let existant = pointsParDate[jour] {
                                 if e1rm > existant.e1rm {
@@ -310,8 +515,7 @@ struct PerformanceDashboardView: View {
     }
     
     private func meilleurE1RMPourMouvement(_ mouvement: MouvementCompetition) -> Double {
-        let points = pointsE1RMPourMouvement(mouvement)
-        return points.map(\.e1rm).max() ?? 0
+        pointsE1RMPourMouvement(mouvement).map(\.e1rm).max() ?? 0
     }
     
     private func correspondAuMouvement(nom: String, mouv: MouvementCompetition) -> Bool {
@@ -328,7 +532,7 @@ struct PerformanceDashboardView: View {
     
     private func donneesTonnageHebdo() -> [TonnageHebdoPoint] {
         var data: [TonnageHebdoPoint] = []
-        guard let bloc = blocs.first else { return [] }
+        guard let bloc = weeklyBloc else { return [] }
         
         for semaine in bloc.semaines.sorted(by: { $0.numero < $1.numero }) {
             var tonnagesParCat: [String: Double] = [
@@ -376,7 +580,7 @@ struct PerformanceDashboardView: View {
     }
     
     private func rpeMoyenParSemaine() -> [(semaine: Int, rpeMoyen: Double)] {
-        guard let bloc = blocs.first else { return [] }
+        guard let bloc = weeklyBloc else { return [] }
         var res: [(semaine: Int, rpeMoyen: Double)] = []
         
         for sem in bloc.semaines.sorted(by: { $0.numero < $1.numero }) {

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import UIKit
 
 struct SeanceDetailView: View {
     let seance: Seance
@@ -38,7 +39,6 @@ struct SeanceDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header minimaliste de progression en temps réel
             SeanceProgressHeaderView(
                 seance: seance,
                 dateDebutSeance: dateDebutSeance
@@ -46,10 +46,9 @@ struct SeanceDetailView: View {
             
             ScrollViewReader { scrollProxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 24) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(exercicesTries.enumerated()), id: \.element.persistentModelID) { exIndex, exercice in
-                            VStack(alignment: .leading, spacing: 10) {
-                                // MARK: - En-tête d'exercice clair (Numéro, Nom, e1RM discret & badge d'échauffement filtré)
+                            VStack(alignment: .leading, spacing: 0) {
                                 ExerciceSectionHeaderView(
                                     numeroExercice: exIndex + 1,
                                     exercice: exercice,
@@ -61,7 +60,6 @@ struct SeanceDetailView: View {
                                 )
                                 .id(exercice.persistentModelID)
                                 
-                                // Suggestion discrète d'adaptation Back-offs si dépassement RPE sur Top Set
                                 if let suggestionDelta = detecterDepassementRPETopSet(pour: exercice) {
                                     BackoffAdaptationBannerView(
                                         rpeDepassement: suggestionDelta,
@@ -71,77 +69,66 @@ struct SeanceDetailView: View {
                                     )
                                 }
                                 
-                                // MARK: - Carte unifiée regroupant toutes les séries de l'exercice
-                                VStack(spacing: 0) {
-                                    ForEach(Array(exercice.series.enumerated()), id: \.element.persistentModelID) { index, serie in
-                                        let isActive = (prochaineSerieActive?.persistentModelID == serie.persistentModelID)
-                                        let isExpanded = (expandedSerieID == serie.persistentModelID)
-                                        let isPR = estNouveauPRTheorique(serie: serie, dans: exercice)
-                                        
-                                        SerieCompactRowView(
-                                            serie: serie,
-                                            numeroSerie: index + 1,
-                                            isNextActiveSet: isActive,
-                                            isExpanded: isExpanded,
-                                            isTheoreticalPR: isPR,
-                                            onTapRow: {
-                                                HapticAndSoundManager.shared.triggerSelection()
-                                                withAnimation(.snappy(duration: 0.25)) {
-                                                    if expandedSerieID == serie.persistentModelID {
-                                                        expandedSerieID = nil
-                                                    } else {
-                                                        expandedSerieID = serie.persistentModelID
-                                                    }
+                                PTHairline()
+                                
+                                ForEach(Array(exercice.series.enumerated()), id: \.element.persistentModelID) { index, serie in
+                                    let isActive = (prochaineSerieActive?.persistentModelID == serie.persistentModelID)
+                                    let isExpanded = (expandedSerieID == serie.persistentModelID)
+                                    let isPR = estNouveauPRTheorique(serie: serie, dans: exercice)
+                                    let isTopSet = estUnTopSet(serie: serie, index: index, dans: exercice)
+                                    
+                                    SerieCompactRowView(
+                                        serie: serie,
+                                        numeroSerie: index + 1,
+                                        isTopSet: isTopSet,
+                                        isNextActiveSet: isActive,
+                                        isExpanded: isExpanded,
+                                        isTheoreticalPR: isPR,
+                                        onTapRow: {
+                                            HapticAndSoundManager.shared.triggerSelection()
+                                            withAnimation(.snappy(duration: 0.25)) {
+                                                if expandedSerieID == serie.persistentModelID {
+                                                    expandedSerieID = nil
+                                                } else {
+                                                    expandedSerieID = serie.persistentModelID
                                                 }
-                                            },
-                                            onValidateSerie: {
-                                                gererValidationSerie(
-                                                    serie: serie,
-                                                    index: index,
-                                                    exercice: exercice,
-                                                    scrollProxy: scrollProxy
-                                                )
                                             }
-                                        )
-                                        .id(serie.persistentModelID)
-                                        
-                                        if index < exercice.series.count - 1 {
-                                            Divider()
-                                                .background(Color.white.opacity(0.08))
-                                                .padding(.leading, 16)
+                                        },
+                                        onValidateSerie: {
+                                            gererValidationSerie(
+                                                serie: serie,
+                                                index: index,
+                                                exercice: exercice,
+                                                scrollProxy: scrollProxy
+                                            )
                                         }
+                                    )
+                                    .id(serie.persistentModelID)
+                                    
+                                    if index < exercice.series.count - 1 {
+                                        PTHairline(leadingInset: 20)
+                                    } else {
+                                        PTHairline()
                                     }
                                 }
-                                .background(Color(white: 0.11))
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             }
                         }
                         
-                        // Bouton de fin de séance épuré
+                        // Bouton de fin de séance sobre (capsule blanche)
                         Button(action: {
                             HapticAndSoundManager.shared.triggerPRValidated()
                             timerManager.stopTimer()
                             SeanceProgressTracker.shared.markSeanceClosed(seance)
                             isShowingSummarySheet = true
                         }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "flag.checkered")
-                                    .font(.headline)
-                                Text("Terminer la séance")
-                                    .font(.headline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .foregroundColor(.black)
-                            .background(Color.orange)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            Text("Terminer la séance")
+                                .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.plain)
-                        .padding(.top, 8)
-                        .padding(.bottom, 24)
+                        .buttonStyle(PTPrimaryPillButtonStyle())
+                        .padding(.horizontal, 20)
+                        .padding(.top, 24)
+                        .padding(.bottom, 32)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onAppear {
@@ -149,7 +136,6 @@ struct SeanceDetailView: View {
                     demanderAutorisationNotifications()
                     HapticAndSoundManager.shared.prepareGenerators()
                     
-                    // Ouvre par défaut le tiroir sur la série active en cours
                     expandedSerieID = prochaineSerieActive?.persistentModelID
                     
                     if let targetEx = prochainExerciceActif {
@@ -162,7 +148,7 @@ struct SeanceDetailView: View {
                 }
             }
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(PTTheme.bg.ignoresSafeArea())
         .navigationTitle(seance.titre ?? seance.date.formatted(date: .abbreviated, time: .omitted))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
@@ -175,7 +161,7 @@ struct SeanceDetailView: View {
                 }) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.body)
-                        .foregroundColor(.orange)
+                        .foregroundColor(PTTheme.textPrimary)
                 }
             }
             
@@ -185,9 +171,9 @@ struct SeanceDetailView: View {
                     HapticAndSoundManager.shared.triggerSelection()
                     hideKeyboard()
                 }) {
-                    Text("OK / Fermer")
+                    Text("OK")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.orange)
+                        .foregroundColor(PTTheme.accent)
                 }
             }
         }
@@ -400,7 +386,7 @@ struct SeanceDetailView: View {
     }
 }
 
-// MARK: - En-tête d'Exercice Clair & Badge d'Échauffement Intelligent
+// MARK: - En-tête d'Exercice Éditorial (Sans Emojis ni Boîtes)
 
 struct ExerciceSectionHeaderView: View {
     let numeroExercice: Int
@@ -408,73 +394,88 @@ struct ExerciceSectionHeaderView: View {
     let meilleurE1RM: Double?
     let onTapWarmup: () -> Void
     
+    private var labelCategorie: String {
+        let num = String(format: "%02d", numeroExercice)
+        switch exercice.categorie {
+        case .competition: return "\(num) · Compétition"
+        case .polyarticulaire: return "\(num) · Polyarticulaire"
+        case .isolation: return "\(num) · Isolation"
+        }
+    }
+    
     private var texteBadgeEchauffement: String {
-        let reps = exercice.repsCiblesTopSet
-        let motRep = reps > 1 ? "reps" : "rep"
         if let charge = exercice.chargeCibleTopSet, charge > 0 {
-            let chargeStr = charge.truncatingRemainder(dividingBy: 1.0) == 0
-                ? String(format: "%.0f", charge)
-                : String(format: "%.1f", charge)
-            return "🔥 Échauffement (vers \(reps) \(motRep) @ \(chargeStr) kg)"
+            return "Échauffement · \(PTFormat.weight(charge)) kg"
         } else {
-            return "🔥 Échauffement (vers \(reps) \(motRep))"
+            let reps = exercice.repsCiblesTopSet
+            let motRep = reps > 1 ? "reps" : "rep"
+            return "Échauffement · \(reps) \(motRep)"
         }
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 10) {
-                Text("\(numeroExercice). \(exercice.nom)")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+            HStack(alignment: .firstTextBaseline) {
+                PTKicker(text: labelCategorie)
                 
-                Spacer(minLength: 4)
+                Spacer(minLength: 6)
                 
                 if let e1rm = meilleurE1RM {
-                    Text("e1RM \(e1rm, specifier: "%.1f") kg")
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.secondary)
+                    Text("e1RM \(PTFormat.weight(e1rm)) kg")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundColor(PTTheme.accent)
                         .lineLimit(1)
                 }
             }
             
-            HStack(alignment: .center, spacing: 8) {
-                // Affiché uniquement si l'exercice nécessite un échauffement (masqué pour l'isolation et poids du corps)
-                if exercice.necessiteEchauffement {
-                    Button(action: onTapWarmup) {
+            Text(exercice.nom)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(PTTheme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            
+            if let indications = exercice.indications, !indications.isEmpty {
+                Text(indications)
+                    .font(.caption)
+                    .foregroundColor(PTTheme.textSecondary)
+                    .lineLimit(2)
+            }
+            
+            if exercice.necessiteEchauffement {
+                Button(action: onTapWarmup) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "flame")
+                            .font(.caption2.weight(.semibold))
                         Text(texteBadgeEchauffement)
-                            .font(.caption.weight(.medium).monospacedDigit())
-                            .foregroundColor(.orange)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color(white: 0.15))
-                            .clipShape(Capsule())
+                            .font(.caption.weight(.semibold).monospacedDigit())
                     }
-                    .buttonStyle(.plain)
+                    .foregroundColor(PTTheme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(PTTheme.surface)
+                    .overlay(
+                        Capsule()
+                            .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+                    )
+                    .clipShape(Capsule())
                 }
-                
-                if let indications = exercice.indications, !indications.isEmpty {
-                    Text(indications)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
             }
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 10)
     }
 }
 
-// MARK: - Ligne de Série Compacte (~50pt) + Tiroir Dépliable à la Demande
+// MARK: - Ligne de Série Bord-à-Bord + Tiroir Dépliable
 
 struct SerieCompactRowView: View {
     @Bindable var serie: Serie
     
     let numeroSerie: Int
+    let isTopSet: Bool
     let isNextActiveSet: Bool
     let isExpanded: Bool
     let isTheoreticalPR: Bool
@@ -483,95 +484,105 @@ struct SerieCompactRowView: View {
     
     private let rpeOptions: [Double] = [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
     
+    private var rowIndexLabel: String {
+        isTopSet ? "Top" : String(format: "%02d", numeroSerie)
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: Ligne principale compacte (~50pt)
+            // Ligne principale
             HStack(spacing: 10) {
-                // 1. Badge numéro (#1, #2...)
-                Text("#\(numeroSerie)")
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundColor(isNextActiveSet ? .orange : .secondary)
+                Text(rowIndexLabel)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(isNextActiveSet ? PTTheme.accent : PTTheme.textSecondary)
                     .lineLimit(1)
-                    .frame(width: 28, alignment: .leading)
+                    .frame(width: 30, alignment: .leading)
                 
-                // 2. Cible compacte sur une seule ligne (ex: 5 reps @ 6)
-                HStack(spacing: 5) {
-                    Text("\(serie.repsCibles) reps @ \(formatRPE(serie.rpeCible))")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundColor(.white)
+                HStack(spacing: 6) {
+                    Text("\(serie.repsCibles) reps @ \(PTFormat.rpe(serie.rpeCible))")
+                        .font(.subheadline.weight(.medium).monospacedDigit())
+                        .foregroundColor(PTTheme.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                     
                     if isTheoreticalPR {
                         Text("PR")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.orange)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.15))
-                            .clipShape(Capsule())
+                            .tracking(0.6)
+                            .foregroundColor(PTTheme.accent)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onTapRow)
                 
-                // 3. Champ Charge épuré (125 kg)
+                // Champ Charge épuré
                 HStack(spacing: 2) {
                     TextField("-", value: $serie.chargeSaisie, format: .number)
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
-                        .foregroundColor(.white)
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .foregroundColor(PTTheme.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                     
                     Text("kg")
                         .font(.caption.monospacedDigit())
-                        .foregroundColor(.secondary)
+                        .foregroundColor(PTTheme.textSecondary)
                         .lineLimit(1)
                 }
-                .padding(.horizontal, 8)
-                .frame(width: 76, height: 34)
-                .background(Color(white: 0.18))
+                .padding(.horizontal, 9)
+                .frame(width: 78, height: 34)
+                .background(PTTheme.surfaceElevated)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(PTTheme.hairline, lineWidth: 0.5)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 
-                // 4. Champ RPE épuré (RPE 6) — ouvre/ferme le tiroir au tap
+                // Bouton RPE discret
                 Button(action: onTapRow) {
                     let displayRPE = serie.rpeSaisi ?? serie.rpeCible
-                    Text("RPE \(formatRPE(displayRPE))")
-                        .font(.caption.weight(.medium).monospacedDigit())
-                        .foregroundColor(serie.rpeSaisi != nil ? .white : .secondary)
+                    Text("@\(PTFormat.rpe(displayRPE))")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundColor(serie.rpeSaisi != nil ? PTTheme.textPrimary : PTTheme.textSecondary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .padding(.horizontal, 8)
-                        .frame(width: 64, height: 34)
-                        .background(Color(white: 0.18))
+                        .frame(width: 44, height: 34)
+                        .background(PTTheme.surfaceElevated)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 
-                // 5. Bouton de validation circulaire simple (28x28pt)
+                // Bouton de validation circulaire (26pt)
                 Button(action: onValidateSerie) {
-                    Image(systemName: serie.estValidee ? "checkmark.circle.fill" : "circle")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 28, height: 28)
-                        .foregroundColor(
-                            serie.estValidee
-                                ? .green
-                                : (isNextActiveSet ? .orange : Color(white: 0.35))
-                        )
-                        .frame(width: 36, height: 36)
-                        .contentShape(Circle())
+                    ZStack {
+                        if serie.estValidee {
+                            Circle()
+                                .fill(PTTheme.textPrimary)
+                                .frame(width: 26, height: 26)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(PTTheme.bg)
+                        } else {
+                            Circle()
+                                .stroke(isNextActiveSet ? PTTheme.accent : PTTheme.textTertiary, lineWidth: 1.5)
+                                .frame(width: 26, height: 26)
+                        }
+                    }
+                    .frame(width: 34, height: 34)
+                    .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(serie.estValidee ? "Série validée" : "Valider la série")
             }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 50)
+            .padding(.horizontal, 20)
+            .frame(minHeight: 54)
             
-            // MARK: Tiroir d'édition dépliable (Steppers sobres + Pilules RPE sobres)
+            // Tiroir d'édition rapide
             if isExpanded {
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
@@ -587,16 +598,15 @@ struct SerieCompactRowView: View {
                             onLongOrDouble: { ajusterCharge(5.0) }
                         )
                         
-                        Divider()
-                            .frame(height: 20)
-                            .background(Color.white.opacity(0.12))
+                        Rectangle()
+                            .fill(PTTheme.hairline)
+                            .frame(width: 0.5, height: 20)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
                                 ForEach(rpeOptions, id: \.self) { rpeValue in
                                     let currentRPE = serie.rpeSaisi ?? serie.rpeCible
                                     let isSelected = abs(currentRPE - rpeValue) < 0.01
-                                    let selectedColor = couleurSelectionRPE(rpeValue)
                                     
                                     Button(action: {
                                         HapticAndSoundManager.shared.triggerSelection()
@@ -604,16 +614,14 @@ struct SerieCompactRowView: View {
                                             serie.rpeSaisi = rpeValue
                                         }
                                     }) {
-                                        Text(formatRPE(rpeValue))
-                                            .font(.caption.weight(.semibold).monospacedDigit())
-                                            .foregroundColor(isSelected ? .black : .secondary)
+                                        Text(PTFormat.rpe(rpeValue))
+                                            .font(.caption.weight(.bold).monospacedDigit())
+                                            .foregroundColor(isSelected ? PTTheme.bg : PTTheme.textSecondary)
                                             .lineLimit(1)
                                             .frame(minWidth: 32, minHeight: 28)
                                             .padding(.horizontal, 4)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                                    .fill(isSelected ? selectedColor : Color(white: 0.18))
-                                            )
+                                            .background(isSelected ? PTTheme.textPrimary : PTTheme.surfaceElevated)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -621,21 +629,21 @@ struct SerieCompactRowView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 10)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
                 .padding(.top, 2)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(isNextActiveSet || isExpanded ? Color(white: 0.15) : Color.clear)
+        .background(isNextActiveSet || isExpanded ? PTTheme.surface : Color.clear)
         .overlay(alignment: .leading) {
             if isNextActiveSet {
                 Rectangle()
-                    .fill(Color.orange)
-                    .frame(width: 3)
+                    .fill(PTTheme.accent)
+                    .frame(width: 2)
             }
         }
-        .opacity(serie.estValidee ? 0.55 : 1.0)
+        .opacity(serie.estValidee ? 0.48 : 1.0)
         .animation(.snappy(duration: 0.25), value: serie.estValidee)
         .animation(.snappy(duration: 0.25), value: isExpanded)
     }
@@ -647,27 +655,9 @@ struct SerieCompactRowView: View {
         let base = serie.chargeSaisie ?? 0.0
         serie.chargeSaisie = max(0.0, base + delta)
     }
-    
-    private func formatRPE(_ value: Double) -> String {
-        if value.truncatingRemainder(dividingBy: 1.0) == 0 {
-            return String(format: "%.0f", value)
-        } else {
-            return String(format: "%.1f", value)
-        }
-    }
-    
-    private func couleurSelectionRPE(_ rpe: Double) -> Color {
-        if rpe <= 7.0 {
-            return .green
-        } else if rpe <= 8.5 {
-            return .orange
-        } else {
-            return .red
-        }
-    }
 }
 
-// MARK: - Bouton Stepper Compact sans Sous-Texte
+// MARK: - Bouton Stepper Compact
 
 struct CompactStepButton: View {
     let label: String
@@ -676,12 +666,16 @@ struct CompactStepButton: View {
     
     var body: some View {
         Text(label)
-            .font(.caption.weight(.semibold).monospacedDigit())
-            .foregroundColor(.white)
+            .font(.caption.weight(.bold).monospacedDigit())
+            .foregroundColor(PTTheme.textPrimary)
             .lineLimit(1)
             .minimumScaleFactor(0.85)
-            .frame(width: 44, height: 28)
-            .background(Color(white: 0.20))
+            .frame(width: 46, height: 28)
+            .background(PTTheme.surfaceElevated)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+            )
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .contentShape(Rectangle())
             .highPriorityGesture(
@@ -696,7 +690,7 @@ struct CompactStepButton: View {
     }
 }
 
-// MARK: - Header de Progression Minimaliste
+// MARK: - Header de Télémétrie de Séance (Style Flighty)
 
 struct SeanceProgressHeaderView: View {
     let seance: Seance
@@ -710,47 +704,28 @@ struct SeanceProgressHeaderView: View {
     }
     
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             HStack {
-                Text("\(seriesValidees) / \(totalSeries) séries • \(pourcentage)%")
-                    .font(.caption.weight(.medium).monospacedDigit())
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+                PTKicker(text: "\(seriesValidees) / \(totalSeries) séries · \(pourcentage)%")
                 
                 Spacer()
                 
                 TimelineView(.periodic(from: dateDebutSeance, by: 1.0)) { context in
-                    HStack(spacing: 4) {
-                        Image(systemName: "stopwatch")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text(formatDuration(from: dateDebutSeance, to: context.date))
-                            .font(.caption.monospacedDigit())
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
+                    Text(formatDuration(from: dateDebutSeance, to: context.date))
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundColor(PTTheme.textSecondary)
+                        .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 20)
             .padding(.top, 8)
             
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color(white: 0.15))
-                        .frame(height: 3)
-                    
-                    Capsule()
-                        .fill(seriesValidees == totalSeries && totalSeries > 0 ? Color.green : Color.orange)
-                        .frame(width: max(0, geo.size.width * seance.progressionRatio), height: 3)
-                        .animation(.snappy, value: seriesValidees)
-                }
-            }
-            .frame(height: 3)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 6)
+            PTProgressHairline(
+                ratio: seance.progressionRatio,
+                color: (seriesValidees == totalSeries && totalSeries > 0) ? PTTheme.success : PTTheme.accent
+            )
         }
-        .background(Color(white: 0.08))
+        .background(PTTheme.bg)
     }
     
     private func formatDuration(from start: Date, to now: Date) -> String {
@@ -774,13 +749,9 @@ struct BackoffAdaptationBannerView: View {
     
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "info.circle.fill")
-                .foregroundColor(.orange)
-                .font(.subheadline)
-            
-            Text("Top Set +\(String(format: "%.1f", rpeDepassement)) RPE : alléger Back-offs ?")
-                .font(.caption.monospacedDigit())
-                .foregroundColor(.secondary)
+            Text("Top Set +\(String(format: "%.1f", rpeDepassement)) RPE · Alléger")
+                .font(.caption.weight(.medium).monospacedDigit())
+                .foregroundColor(PTTheme.accent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
             
@@ -788,30 +759,35 @@ struct BackoffAdaptationBannerView: View {
             
             Button(action: { onApplyReduction(2.5) }) {
                 Text("-2.5 kg")
-                    .font(.caption.weight(.semibold).monospacedDigit())
-                    .foregroundColor(.orange)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(white: 0.18))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundColor(PTTheme.textPrimary)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(PTTheme.surfaceElevated)
+                    .overlay(Capsule().stroke(PTTheme.hairlineStrong, lineWidth: 0.5))
+                    .clipShape(Capsule())
             }
             .buttonStyle(.plain)
             
             Button(action: { onApplyReduction(5.0) }) {
                 Text("-5 kg")
-                    .font(.caption.weight(.semibold).monospacedDigit())
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(white: 0.18))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundColor(PTTheme.bg)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(PTTheme.textPrimary)
+                    .clipShape(Capsule())
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(PTTheme.surface)
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(PTTheme.accent)
+                .frame(width: 2)
+        }
     }
 }
 

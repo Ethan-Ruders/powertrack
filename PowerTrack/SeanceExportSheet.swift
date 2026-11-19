@@ -36,30 +36,37 @@ struct SeanceExportSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
-                    ressentisCard
-                    douleurEtNotesCard
-                    actionsCard
+                VStack(alignment: .leading, spacing: 26) {
+                    ressentisSection
+                    douleurEtNotesSection
+                    actionsSection
                     
                     if let msg = feedbackMessage {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             Image(systemName: feedbackIsPositive ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                .foregroundColor(feedbackIsPositive ? .green : .orange)
+                                .foregroundColor(feedbackIsPositive ? PTTheme.success : PTTheme.accent)
                             Text(msg)
                                 .font(.caption)
-                                .foregroundColor(.white)
+                                .foregroundColor(PTTheme.textPrimary)
                             Spacer()
                         }
-                        .padding(12)
-                        .background(Color(white: 0.14))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .padding(14)
+                        .background(PTTheme.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .padding(.horizontal, 16)
                     }
                 }
-                .padding(16)
+                .padding(.vertical, 20)
             }
-            .background(Color.black.ignoresSafeArea())
+            .scrollDismissesKeyboard(.interactively)
+            .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Ressentis & Export")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -67,7 +74,7 @@ struct SeanceExportSheet: View {
                         sauvegarderRessenti()
                         dismiss()
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundColor(PTTheme.textSecondary)
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
@@ -75,7 +82,7 @@ struct SeanceExportSheet: View {
                         isShowingSettings = true
                     } label: {
                         Image(systemName: "gearshape")
-                            .foregroundColor(.orange)
+                            .foregroundColor(PTTheme.accent)
                     }
                 }
             }
@@ -89,139 +96,167 @@ struct SeanceExportSheet: View {
     
     // MARK: - Sections UI
     
-    private var ressentisCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Check-in Récupération (optionnel)")
-                .font(.headline)
-                .foregroundColor(.white)
+    private var ressentisSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PTKicker(text: "Check-in récupération (optionnel)")
+                .padding(.horizontal, 16)
             
-            // Poids du corps
-            HStack {
-                Text("Poids du corps")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                Spacer()
-                HStack(spacing: 4) {
-                    TextField("74.5", value: $ressenti.poidsCorpsKg, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
-                        .foregroundColor(.white)
-                        .frame(width: 64)
-                    Text("kg")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color(white: 0.17))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            
-            // Sommeil & Hydratation
-            stepperRow(
-                label: "Sommeil",
-                valueText: ressenti.sommeilHeures.map { String(format: "%.1f h", $0) } ?? "-",
-                onMinus: {
-                    let current = ressenti.sommeilHeures ?? 7.5
-                    ressenti.sommeilHeures = max(0, (current - 0.5).roundedToHalf)
-                },
-                onPlus: {
-                    let current = ressenti.sommeilHeures ?? 7.0
-                    ressenti.sommeilHeures = min(14, (current + 0.5).roundedToHalf)
-                }
-            )
-            
-            stepperRow(
-                label: "Hydratation",
-                valueText: ressenti.hydratationLitres.map { String(format: "%.2f L", $0) } ?? "-",
-                onMinus: {
-                    let current = ressenti.hydratationLitres ?? 2.0
-                    ressenti.hydratationLitres = max(0, ((current - 0.25) * 4).rounded() / 4)
-                },
-                onPlus: {
-                    let current = ressenti.hydratationLitres ?? 1.75
-                    ressenti.hydratationLitres = min(6, ((current + 0.25) * 4).rounded() / 4)
-                }
-            )
-            
-            Divider().background(Color.white.opacity(0.08))
-            
-            ratingPickerRow(titre: "Énergie (1 = vidé, 5 = top)", selection: $ressenti.niveauEnergie)
-            ratingPickerRow(titre: "Fatigue lombaire (1 = frais, 5 = saturé)", selection: $ressenti.fatigueLombaire)
-            ratingPickerRow(titre: "Stress / DS (1 = zen, 5 = élevé)", selection: $ressenti.stress)
-        }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-    
-    private var douleurEtNotesCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Douleurs & Observations Techniques")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(douleursRapides, id: \.self) { label in
-                        let isSelected = douleurDetail == label
-                        Button {
-                            HapticAndSoundManager.shared.triggerSelection()
-                            douleurDetail = isSelected ? "" : label
-                        } label: {
-                            Text(label)
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(isSelected ? .black : .white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(isSelected ? Color.orange : Color(white: 0.18))
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                // Poids du corps
+                HStack {
+                    Text("Poids du corps")
+                        .font(.subheadline)
+                        .foregroundColor(PTTheme.textSecondary)
+                    Spacer()
+                    HStack(spacing: 6) {
+                        TextField("74.5", value: $ressenti.poidsCorpsKg, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                            .foregroundColor(PTTheme.textPrimary)
+                            .frame(width: 64)
+                        Text("kg")
+                            .font(.caption)
+                            .foregroundColor(PTTheme.textTertiary)
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(PTTheme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(PTTheme.hairline, lineWidth: 0.5)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                
+                PTHairline(leadingInset: 16)
+                
+                stepperRow(
+                    label: "Sommeil",
+                    valueText: ressenti.sommeilHeures.map { String(format: "%.1f h", $0) } ?? "—",
+                    onMinus: {
+                        let current = ressenti.sommeilHeures ?? 7.5
+                        ressenti.sommeilHeures = max(0, (current - 0.5).roundedToHalf)
+                    },
+                    onPlus: {
+                        let current = ressenti.sommeilHeures ?? 7.0
+                        ressenti.sommeilHeures = min(14, (current + 0.5).roundedToHalf)
+                    }
+                )
+                
+                PTHairline(leadingInset: 16)
+                
+                stepperRow(
+                    label: "Hydratation",
+                    valueText: ressenti.hydratationLitres.map { String(format: "%.2f L", $0) } ?? "—",
+                    onMinus: {
+                        let current = ressenti.hydratationLitres ?? 2.0
+                        ressenti.hydratationLitres = max(0, ((current - 0.25) * 4).rounded() / 4)
+                    },
+                    onPlus: {
+                        let current = ressenti.hydratationLitres ?? 1.75
+                        ressenti.hydratationLitres = min(6, ((current + 0.25) * 4).rounded() / 4)
+                    }
+                )
+                
+                PTHairline()
+                
+                VStack(alignment: .leading, spacing: 14) {
+                    ratingPickerRow(titre: "Énergie (1 = vidé, 5 = top)", selection: $ressenti.niveauEnergie)
+                    ratingPickerRow(titre: "Fatigue lombaire (1 = frais, 5 = saturé)", selection: $ressenti.fatigueLombaire)
+                    ratingPickerRow(titre: "Stress / DS (1 = zen, 5 = élevé)", selection: $ressenti.stress)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                
+                PTHairline()
             }
-            
-            TextField("Autre douleur ou précision (ex: léger tiraillement coude gauche)", text: $douleurDetail)
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .padding(10)
-                .background(Color(white: 0.17))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            
-            TextField("Notes séance (ex: depth limite, bench asymétrique, barre frotte)", text: $notesText, axis: .vertical)
-                .lineLimit(2...4)
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .padding(10)
-                .background(Color(white: 0.17))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
     
-    private var actionsCard: some View {
+    private var douleurEtNotesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PTKicker(text: "Douleurs & observations techniques")
+                .padding(.horizontal, 16)
+            
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(douleursRapides, id: \.self) { label in
+                                let isSelected = douleurDetail == label
+                                Button {
+                                    HapticAndSoundManager.shared.triggerSelection()
+                                    douleurDetail = isSelected ? "" : label
+                                } label: {
+                                    Text(label)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(isSelected ? PTTheme.bg : PTTheme.textSecondary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .background(isSelected ? PTTheme.accent : PTTheme.surface)
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(isSelected ? Color.clear : PTTheme.hairline, lineWidth: 0.5)
+                                        )
+                                        .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    
+                    TextField("Autre douleur ou précision (ex: léger tiraillement coude gauche)", text: $douleurDetail)
+                        .font(.subheadline)
+                        .foregroundColor(PTTheme.textPrimary)
+                        .padding(11)
+                        .background(PTTheme.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    
+                    TextField("Notes séance (ex: depth limite, bench asymétrique, barre frotte)", text: $notesText, axis: .vertical)
+                        .lineLimit(2...4)
+                        .font(.subheadline)
+                        .foregroundColor(PTTheme.textPrimary)
+                        .padding(11)
+                        .background(PTTheme.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                
+                PTHairline()
+            }
+        }
+    }
+    
+    private var actionsSection: some View {
         VStack(spacing: 10) {
             Button(action: envoyerVersServeur) {
                 HStack(spacing: 8) {
                     if isExporting {
-                        ProgressView().tint(.black)
+                        ProgressView().tint(PTTheme.bg)
                     } else {
                         Image(systemName: "paperplane.fill")
                     }
                     Text(isExporting ? "Envoi en cours..." : "Envoyer vers Serveur Linux (n8n)")
-                        .font(.headline)
                 }
-                .foregroundColor(.black)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.orange)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PTPrimaryPillButtonStyle(isDisabled: isExporting))
             .disabled(isExporting)
             
             HStack(spacing: 10) {
@@ -229,15 +264,10 @@ struct SeanceExportSheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: copiedJSON ? "checkmark" : "doc.on.doc")
                         Text(copiedJSON ? "JSON copié" : "Copier JSON")
-                            .font(.subheadline.weight(.semibold))
                     }
-                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color(white: 0.16))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PTSecondaryPillButtonStyle())
                 
                 ShareLink(
                     item: jsonCourant(),
@@ -246,16 +276,22 @@ struct SeanceExportSheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: "square.and.arrow.up")
                         Text("Partager")
-                            .font(.subheadline.weight(.semibold))
                     }
-                    .foregroundColor(.orange)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(PTTheme.accent)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color(white: 0.16))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 13)
+                    .background(PTTheme.surfaceElevated)
+                    .overlay(
+                        Capsule()
+                            .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+                    )
+                    .clipShape(Capsule())
                 }
             }
         }
+        .padding(.horizontal, 16)
     }
     
     // MARK: - Sous-vues
@@ -264,48 +300,58 @@ struct SeanceExportSheet: View {
         HStack {
             Text(label)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(PTTheme.textSecondary)
             Spacer()
             HStack(spacing: 8) {
-                Button(action: {
+                Button {
                     HapticAndSoundManager.shared.triggerSelection()
                     onMinus()
-                }) {
+                } label: {
                     Image(systemName: "minus")
                         .font(.caption.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(PTTheme.textPrimary)
                         .frame(width: 30, height: 28)
-                        .background(Color(white: 0.20))
+                        .background(PTTheme.surfaceElevated)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 
                 Text(valueText)
                     .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundColor(.white)
-                    .frame(minWidth: 56, alignment: .center)
+                    .foregroundColor(PTTheme.textPrimary)
+                    .frame(minWidth: 58, alignment: .center)
                 
-                Button(action: {
+                Button {
                     HapticAndSoundManager.shared.triggerSelection()
                     onPlus()
-                }) {
+                } label: {
                     Image(systemName: "plus")
                         .font(.caption.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(PTTheme.textPrimary)
                         .frame(width: 30, height: 28)
-                        .background(Color(white: 0.20))
+                        .background(PTTheme.surfaceElevated)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
     
     private func ratingPickerRow(titre: String, selection: Binding<Int?>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(titre)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(PTTheme.textSecondary)
             
             HStack(spacing: 8) {
                 ForEach(1...5, id: \.self) { value in
@@ -316,11 +362,15 @@ struct SeanceExportSheet: View {
                     } label: {
                         Text("\(value)")
                             .font(.subheadline.weight(.semibold).monospacedDigit())
-                            .foregroundColor(isSelected ? .black : .white)
+                            .foregroundColor(isSelected ? PTTheme.bg : PTTheme.textPrimary)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 7)
-                            .background(isSelected ? Color.orange : Color(white: 0.18))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .padding(.vertical, 8)
+                            .background(isSelected ? PTTheme.accent : PTTheme.surface)
+                            .overlay(
+                                Capsule()
+                                    .stroke(isSelected ? Color.clear : PTTheme.hairline, lineWidth: 0.5)
+                            )
+                            .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }

@@ -26,40 +26,47 @@ struct ProgramImportSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
-                    sourceActionsCard
-                    jsonEditorCard
+                VStack(alignment: .leading, spacing: 26) {
+                    sourceActionsSection
+                    jsonEditorSection
                     
                     if let error = errorMessage {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.red)
+                                .foregroundColor(PTTheme.danger)
                             Text(error)
                                 .font(.caption)
-                                .foregroundColor(.white)
+                                .foregroundColor(PTTheme.textPrimary)
                             Spacer()
                         }
                         .padding(12)
-                        .background(Color(white: 0.14))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background(PTTheme.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.danger.opacity(0.4), lineWidth: 0.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .padding(.horizontal, 16)
                     }
                     
                     if let parsed = preview {
-                        previewCard(parsed)
+                        previewSection(parsed)
                     }
                 }
-                .padding(16)
+                .padding(.vertical, 20)
             }
-            .background(Color.black.ignoresSafeArea())
+            .scrollDismissesKeyboard(.interactively)
+            .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Importer un Bloc JSON")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annuler") {
                         dismiss()
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundColor(PTTheme.textSecondary)
                 }
             }
             .fileImporter(
@@ -72,122 +79,153 @@ struct ProgramImportSheet: View {
         }
     }
     
-    // MARK: - Cartes UI
+    // MARK: - Sections UI
     
-    private var sourceActionsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Colle le programme JSON généré par ton coach ou importe un fichier `.json`.")
-                .font(.caption)
-                .foregroundColor(.secondary)
+    private var sourceActionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PTKicker(text: "Source du programme")
+                .padding(.horizontal, 16)
             
-            HStack(spacing: 10) {
-                Button(action: collerPressePapier) {
-                    Label("Coller", systemImage: "doc.on.clipboard")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.orange)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-                .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                PTHairline()
                 
-                Button {
-                    isPickingFile = true
-                } label: {
-                    Label("Fichier .json", systemImage: "folder")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color(white: 0.18))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Colle le programme JSON généré par ton coach ou importe un fichier .json.")
+                        .font(.caption)
+                        .foregroundColor(PTTheme.textSecondary)
+                    
+                    HStack(spacing: 10) {
+                        Button(action: collerPressePapier) {
+                            Label("Coller", systemImage: "doc.on.clipboard")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PTPrimaryPillButtonStyle())
+                        
+                        Button {
+                            isPickingFile = true
+                        } label: {
+                            Label("Fichier .json", systemImage: "folder")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PTSecondaryPillButtonStyle())
+                    }
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                
+                PTHairline()
             }
         }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
     
-    private var jsonEditorCard: some View {
+    private var jsonEditorSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Contenu JSON")
-                .font(.headline)
-                .foregroundColor(.white)
+            PTKicker(text: "Contenu JSON")
+                .padding(.horizontal, 16)
             
-            TextEditor(text: $jsonInput)
-                .scrollContentBackground(.hidden)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.white)
-                .frame(minHeight: 160, maxHeight: 240)
-                .padding(8)
-                .background(Color(white: 0.16))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .onChange(of: jsonInput) { _, _ in
-                    analyserJSON()
-                }
-        }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-    
-    private func previewCard(_ parsed: ProgramImportPreview) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Aperçu prêt à injecter", systemImage: "checkmark.seal.fill")
-                .font(.headline)
-                .foregroundColor(.green)
-            
-            TextField("Nom du bloc", text: $blocNameOverride)
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.white)
-                .padding(10)
-                .background(Color(white: 0.17))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            
-            HStack(spacing: 12) {
-                statPill(label: "Semaines", value: "\(parsed.weekCount)")
-                statPill(label: "Séances", value: "\(parsed.sessionCount)")
-                statPill(label: "Séries", value: "\(parsed.totalSets)")
-            }
-            
-            if parsed.squat1RM > 0 || parsed.bench1RM > 0 || parsed.deadlift1RM > 0 {
-                Text("1RM réf : S \(Int(parsed.squat1RM)) kg • B \(Int(parsed.bench1RM)) kg • D \(Int(parsed.deadlift1RM)) kg")
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(.secondary)
-            }
-            
-            Button(action: { injecter(parsed) }) {
-                Text("Injecter dans PowerTrack")
-                    .font(.headline)
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                TextEditor(text: $jsonInput)
+                    .scrollContentBackground(.hidden)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(PTTheme.textPrimary)
+                    .frame(minHeight: 160, maxHeight: 240)
+                    .padding(10)
+                    .background(PTTheme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(PTTheme.hairline, lineWidth: 0.5)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 14)
-                    .background(Color.orange)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .onChange(of: jsonInput) { _, _ in
+                        analyserJSON()
+                    }
+                
+                PTHairline()
             }
-            .buttonStyle(.plain)
         }
-        .padding(16)
-        .background(Color(white: 0.11))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
     
-    private func statPill(label: String, value: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.headline.monospacedDigit())
-                .foregroundColor(.orange)
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(.secondary)
+    private func previewSection(_ parsed: ProgramImportPreview) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(PTTheme.success)
+                    .frame(width: 6, height: 6)
+                PTKicker(text: "Aperçu prêt à injecter", color: PTTheme.success)
+            }
+            .padding(.horizontal, 16)
+            
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                TextField("Nom du bloc", text: $blocNameOverride)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(PTTheme.textPrimary)
+                    .padding(11)
+                    .background(PTTheme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(PTTheme.hairline, lineWidth: 0.5)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                
+                PTHairline()
+                
+                HStack(spacing: 0) {
+                    statColumn(label: "Semaines", value: "\(parsed.weekCount)")
+                    verticalHairline
+                    statColumn(label: "Séances", value: "\(parsed.sessionCount)")
+                    verticalHairline
+                    statColumn(label: "Séries", value: "\(parsed.totalSets)")
+                }
+                
+                if parsed.squat1RM > 0 || parsed.bench1RM > 0 || parsed.deadlift1RM > 0 {
+                    PTHairline()
+                    Text("1RM réf · S \(Int(parsed.squat1RM)) kg · B \(Int(parsed.bench1RM)) kg · D \(Int(parsed.deadlift1RM)) kg")
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(PTTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 11)
+                }
+                
+                PTHairline()
+            }
+            
+            Button {
+                injecter(parsed)
+            } label: {
+                Text("Injecter dans PowerTrack")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PTPrimaryPillButtonStyle())
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(Color(white: 0.16))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+    
+    private func statColumn(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            PTKicker(text: label)
+            Text(value)
+                .font(.title3.weight(.bold).monospacedDigit())
+                .foregroundColor(PTTheme.accent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+    
+    private var verticalHairline: some View {
+        Rectangle()
+            .fill(PTTheme.hairline)
+            .frame(width: 0.5)
     }
     
     // MARK: - Actions

@@ -5,7 +5,7 @@
 //  Created by ethan ruders on 13/08/2026.
 //
 
-import SwiftUI
+import Foundation
 
 // MARK: - Modèle d'un Palier d'Échauffement
 
@@ -130,6 +130,9 @@ func genererPaliersEchauffement(pour exercice: Exercice, chargeCibleOverride: Do
         return paliers
     }
 }
+
+#if os(iOS)
+import SwiftUI
 
 // MARK: - Vue Feuille d'Échauffement (WarmupSheet)
 
@@ -290,3 +293,4 @@ struct EchauffementSheetView: View {
         }
     }
 }
+#endif

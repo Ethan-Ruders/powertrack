@@ -21,13 +21,18 @@ struct TopSetSummaryItem: Identifiable {
 struct SeanceSummarySheet: View {
     let seance: Seance
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var exportManager = ExportManager.shared
+    
     @State private var isShowingExportSheet = false
+    @State private var isExportingNow = false
+    @State private var exportFeedback: String? = nil
+    @State private var exportFeedbackPositive = true
     
     // Calculs de synthèse
     private var seriesValidees: [(exercice: Exercice, serie: Serie)] {
         var res: [(exercice: Exercice, serie: Serie)] = []
-        for ex in seance.exercices {
-            for s in ex.series where s.estValidee {
+        for ex in seance.exercices.sorted(by: { $0.ordre < $1.ordre }) {
+            for s in ex.seriesTriees where s.estValidee {
                 res.append((exercice: ex, serie: s))
             }
         }
@@ -60,7 +65,7 @@ struct SeanceSummarySheet: View {
     private var topSetsRealises: [TopSetSummaryItem] {
         var items: [TopSetSummaryItem] = []
         for ex in seance.exercices.sorted(by: { $0.ordre < $1.ordre }) {
-            let seriesVal = ex.series.filter { $0.estValidee }
+            let seriesVal = ex.seriesTriees.filter { $0.estValidee }
             if let heaviest = seriesVal.max(by: { ($0.chargeSaisie ?? 0) < ($1.chargeSaisie ?? 0) }) {
                 items.append(TopSetSummaryItem(
                     nomExercice: ex.nom,
@@ -73,6 +78,16 @@ struct SeanceSummarySheet: View {
             }
         }
         return items
+    }
+    
+    private var statutServeur: (text: String, color: Color) {
+        if exportManager.isSeanceExported(seance) {
+            return ("Synchronisée", PTTheme.success)
+        } else if exportManager.isSeancePendingExport(seance) {
+            return ("En file hors-ligne", PTTheme.accent)
+        } else {
+            return ("Non envoyée", PTTheme.textSecondary)
+        }
     }
     
     var body: some View {
@@ -123,6 +138,14 @@ struct SeanceSummarySheet: View {
                         value: dureeEstimeeTexte,
                         detail: dureeReelleMinutes != nil ? "Temps réel" : "Estimée",
                         valueColor: PTTheme.textPrimary
+                    )
+                    PTHairline(leadingInset: 20)
+                    
+                    metricRow(
+                        label: "Serveur n8n",
+                        value: statutServeur.text,
+                        detail: exportManager.hasValidWebhookURL ? "Webhook configuré" : "Aucun webhook configuré",
+                        valueColor: statutServeur.color
                     )
                     PTHairline()
                     
@@ -185,8 +208,44 @@ struct SeanceSummarySheet: View {
                         }
                     }
                     
+                    if let feedback = exportFeedback {
+                        HStack(spacing: 8) {
+                            Image(systemName: exportFeedbackPositive ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundColor(exportFeedbackPositive ? PTTheme.success : PTTheme.accent)
+                            Text(feedback)
+                                .font(.caption)
+                                .foregroundColor(PTTheme.textPrimary)
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(PTTheme.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(PTTheme.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 18)
+                    }
+                    
                     // Actions finales
                     VStack(spacing: 10) {
+                        if exportManager.hasValidWebhookURL && !exportManager.isSeanceExported(seance) {
+                            Button(action: envoyerDirectementVersN8n) {
+                                HStack(spacing: 8) {
+                                    if isExportingNow {
+                                        ProgressView().tint(PTTheme.textPrimary)
+                                    } else {
+                                        Image(systemName: "arrow.up.circle")
+                                    }
+                                    Text(isExportingNow ? "Envoi vers n8n..." : "Envoyer directement vers n8n")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PTSecondaryPillButtonStyle())
+                            .disabled(isExportingNow)
+                        }
+                        
                         Button(action: {
                             HapticAndSoundManager.shared.triggerLightImpact()
                             isShowingExportSheet = true
@@ -231,7 +290,28 @@ struct SeanceSummarySheet: View {
         }
     }
     
-    // MARK: - Helpers UI
+    // MARK: - Helpers UI & Actions
+    
+    private func envoyerDirectementVersN8n() {
+        isExportingNow = true
+        exportFeedback = nil
+        Task {
+            let outcome = await exportManager.exporterSeance(seance: seance)
+            isExportingNow = false
+            switch outcome {
+            case .sent(let statusCode, _):
+                HapticAndSoundManager.shared.triggerSetValidated()
+                exportFeedbackPositive = true
+                exportFeedback = "Séance synchronisée avec n8n (HTTP \(statusCode))."
+            case .queuedOffline(let reason, _):
+                exportFeedbackPositive = false
+                exportFeedback = "Serveur indisponible : ajoutée à la file hors-ligne (\(reason))."
+            case .missingConfiguration:
+                exportFeedbackPositive = false
+                isShowingExportSheet = true
+            }
+        }
+    }
     
     private func metricRow(label: String, value: String, detail: String?, valueColor: Color) -> some View {
         HStack(spacing: 12) {

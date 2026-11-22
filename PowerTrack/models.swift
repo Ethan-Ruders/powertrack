@@ -9,18 +9,100 @@ import Foundation
 import SwiftData
 import Combine
 
-// MARK: - Énumérations
+// MARK: - Énumérations & Classification SBD
 
-enum CategorieExercice: String, Codable {
+nonisolated enum CategorieExercice: String, Codable, Sendable {
     case competition
     case polyarticulaire
     case isolation
 }
 
-enum TypeEchauffementExercice {
+nonisolated enum TypeEchauffementExercice: Equatable, Sendable {
     case sbdOuVariante
     case polyarticulaireAccessoire
     case aucun
+}
+
+nonisolated enum MouvementParent: String, CaseIterable, Identifiable, Codable, Sendable {
+    case squat
+    case bench
+    case deadlift
+    case autre
+    
+    var id: String { rawValue }
+    
+    var nomAffichage: String {
+        switch self {
+        case .squat: return "Squat"
+        case .bench: return "Bench"
+        case .deadlift: return "Deadlift"
+        case .autre: return "Autre"
+        }
+    }
+    
+    /// Détermine le mouvement de compétition parent depuis le nom d'exercice.
+    static func detecter(nomExercice: String) -> MouvementParent {
+        let lower = nomExercice.lowercased()
+        if lower.contains("bench")
+            || lower.contains("développé couché")
+            || lower.contains("developpe couche")
+            || lower.contains("spoto")
+            || lower.contains("larsen")
+            || lower.contains("3ct") {
+            return .bench
+        }
+        if lower.contains("squat") {
+            return .squat
+        }
+        if lower.contains("deadlift")
+            || lower.contains("soulevé de terre")
+            || lower.contains("souleve de terre")
+            || lower.contains("deficit")
+            || lower.contains("déficit")
+            || lower.contains("block pull") {
+            return .deadlift
+        }
+        return .autre
+    }
+    
+    /// Indique s'il s'agit d'un mouvement SBD de compétition pur (hors variantes / accessoires).
+    static func estMouvementCompetition(nomExercice: String, categorie: CategorieExercice) -> Bool {
+        guard detecter(nomExercice: nomExercice) != .autre else { return false }
+        let lower = nomExercice.lowercased()
+        let motsClesVariante = [
+            "pause", "tempo", "box", "spoto", "larsen", "3ct",
+            "deficit", "déficit", "block pull", "pin", "board",
+            "close grip", "prise serrée", "prise serree",
+            "incliné", "incline", "bulgare", "hack", "goblet",
+            "front", "rdl", "roumain", "stiff"
+        ]
+        return categorie == .competition && !motsClesVariante.contains(where: { lower.contains($0) })
+    }
+}
+
+// MARK: - Scores de Force Athlétique (DOTS & IPF GL)
+
+nonisolated enum PowerliftingScoring {
+    /// Calcule le score DOTS officiel masculin (identique à `analyze_powertrack.py`).
+    static func dotsMale(totalKg: Double, bodyweightKg: Double) -> Double? {
+        guard totalKg > 0, bodyweightKg > 0 else { return nil }
+        let bw = bodyweightKg
+        let denom = -307.75076
+            + 24.0900756 * bw
+            - 0.1918759221 * pow(bw, 2)
+            + 0.0007391293 * pow(bw, 3)
+            - 0.000001093 * pow(bw, 4)
+        guard denom > 0 else { return nil }
+        return ((totalKg * 500.0) / denom * 100.0).rounded() / 100.0
+    }
+    
+    /// Calcule le score IPF Goodlift officiel masculin Classic (3-lift raw).
+    static func ipfGLMaleClassic(totalKg: Double, bodyweightKg: Double) -> Double? {
+        guard totalKg > 0, bodyweightKg > 0 else { return nil }
+        let denom = 1199.72839 - 1025.18162 * exp(-0.00921 * bodyweightKg)
+        guard denom > 0 else { return nil }
+        return ((totalKg * 100.0) / denom * 100.0).rounded() / 100.0
+    }
 }
 
 // MARK: - Modèles
@@ -168,29 +250,63 @@ final class Exercice {
         self.ordre = ordre
     }
     
-    // MARK: - Logique de Filtrage & Éligibilité à l'Échauffement
+    // MARK: - Logique de Filtrage, Ordre & Éligibilité à l'Échauffement
+    
+    /// Séries triées de manière déterministe selon `Serie.ordre` (avec repli sur le schéma Top Set -> Back-offs pour les données historiques).
+    var seriesTriees: [Serie] {
+        guard series.count > 1 else { return series }
+        if series.allSatisfy({ $0.ordre == 0 }) {
+            return series.sorted { a, b in
+                if a.rpeCible != b.rpeCible { return a.rpeCible > b.rpeCible }
+                let ca = a.chargeSaisie ?? 0.0
+                let cb = b.chargeSaisie ?? 0.0
+                if ca != cb { return ca > cb }
+                return a.repsCibles < b.repsCibles
+            }
+        }
+        return series.sorted { $0.ordre < $1.ordre }
+    }
     
     /// Première série de travail (Top Set) servant de référence pour l'échauffement
     var topSetReference: Serie? {
-        series.first
+        seriesTriees.first
     }
     
     /// Charge cible de la première série de travail (Top Set)
     var chargeCibleTopSet: Double? {
-        if let charge = series.first?.chargeSaisie, charge > 0 {
+        let sorted = seriesTriees
+        if let charge = sorted.first?.chargeSaisie, charge > 0 {
             return charge
         }
-        return series.compactMap(\.chargeSaisie).first { $0 > 0 }
+        return sorted.compactMap(\.chargeSaisie).first { $0 > 0 }
     }
     
     /// Répétitions cibles de la première série de travail (Top Set)
     var repsCiblesTopSet: Int {
-        series.first?.repsCibles ?? 5
+        seriesTriees.first?.repsCibles ?? 5
     }
     
     /// RPE cible de la première série de travail (Top Set)
     var rpeCibleTopSet: Double {
-        series.first?.rpeCible ?? 8.0
+        seriesTriees.first?.rpeCible ?? 8.0
+    }
+    
+    /// Mouvement SBD parent unifié (`squat`, `bench`, `deadlift`, `autre`).
+    var mouvementParent: MouvementParent {
+        MouvementParent.detecter(nomExercice: nom)
+    }
+    
+    /// Indique s'il s'agit d'un mouvement SBD de compétition pur (hors variantes / accessoires).
+    var estMouvementCompetitionPur: Bool {
+        MouvementParent.estMouvementCompetition(nomExercice: nom, categorie: categorie)
+    }
+    
+    /// Clé stable pour comparer les PR et rappeler la séance précédente sans mélanger Compétition et Variantes.
+    var cleComparaisonPR: String {
+        if estMouvementCompetitionPur {
+            return "comp_\(mouvementParent.rawValue)"
+        }
+        return "var_\(nom.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))"
     }
     
     /// Détermine le type d'échauffement adapté selon le nom et la catégorie de l'exercice
@@ -244,14 +360,16 @@ final class Serie {
     var chargeSaisie: Double?
     var rpeSaisi: Double?
     var estValidee: Bool
+    var ordre: Int = 0
     var exercice: Exercice?
     
-    init(repsCibles: Int, rpeCible: Double, chargeSaisie: Double? = nil, rpeSaisi: Double? = nil, estValidee: Bool = false) {
+    init(repsCibles: Int, rpeCible: Double, chargeSaisie: Double? = nil, rpeSaisi: Double? = nil, estValidee: Bool = false, ordre: Int = 0) {
         self.repsCibles = repsCibles
         self.rpeCible = rpeCible
         self.chargeSaisie = chargeSaisie
         self.rpeSaisi = rpeSaisi
         self.estValidee = estValidee
+        self.ordre = ordre
     }
     
     /// Calcule le 1RM estimé basé sur la formule d'Epley et le RPE
@@ -303,6 +421,18 @@ final class SeanceProgressTracker: ObservableObject {
             defaults.set(Date(), forKey: startTimePrefix + key)
         }
         defaults.removeObject(forKey: endTimePrefix + key)
+        lastUpdateToken = UUID()
+    }
+    
+    /// Met à jour le suivi local lorsqu'une série est dévalidée (réinitialise si aucune série n'est plus validée).
+    func recordSetUnvalidation(for seance: Seance) {
+        let key = seance.trackingKey
+        if seance.validatedSeriesCount == 0 {
+            defaults.removeObject(forKey: activeDatePrefix + key)
+            defaults.removeObject(forKey: startTimePrefix + key)
+            defaults.removeObject(forKey: endTimePrefix + key)
+            defaults.removeObject(forKey: closedPrefix + key)
+        }
         lastUpdateToken = UUID()
     }
     

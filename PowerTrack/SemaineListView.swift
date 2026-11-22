@@ -4,6 +4,7 @@ import SwiftData
 struct SemaineListView: View {
     let macroBloc: MacroBloc
     @ObservedObject private var progressTracker = SeanceProgressTracker.shared
+    @State private var isShowingEditSheet = false
     
     private var seanceEnCours: Seance? {
         _ = progressTracker.lastUpdateToken
@@ -42,13 +43,24 @@ struct SemaineListView: View {
         .navigationTitle(macroBloc.nom)
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
-        .safeAreaInset(edge: .bottom) {
-            if let seanceActive = seanceEnCours {
-                ResumeWorkoutBannerView(seance: seanceActive)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    HapticAndSoundManager.shared.triggerLightImpact()
+                    isShowingEditSheet = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.body)
+                        .foregroundColor(PTTheme.textPrimary)
+                }
+                .accessibilityLabel("Modifier le bloc")
             }
+        }
+        .sheet(isPresented: $isShowingEditSheet) {
+            BlocEditSheet(macroBloc: macroBloc)
+        }
+        .safeAreaInset(edge: .bottom) {
+            PTBottomOverlayStack(activeSeance: seanceEnCours)
         }
     }
     
@@ -132,5 +144,132 @@ struct SemaineListView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Modale d'Édition de Bloc (Nom & 1RM de référence)
+
+struct BlocEditSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    
+    let macroBloc: MacroBloc
+    
+    @State private var nom: String = ""
+    @State private var squat1RM: Double = 0
+    @State private var bench1RM: Double = 0
+    @State private var deadlift1RM: Double = 0
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        PTKicker(text: "Nom du bloc")
+                            .padding(.horizontal, 20)
+                        
+                        VStack(spacing: 0) {
+                            PTHairline()
+                            TextField("Nom du bloc", text: $nom)
+                                .font(.body.weight(.medium))
+                                .foregroundColor(PTTheme.textPrimary)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 14)
+                                .background(PTTheme.surface)
+                            PTHairline()
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        PTKicker(text: "1RM de référence (kg)")
+                            .padding(.horizontal, 20)
+                        
+                        VStack(spacing: 0) {
+                            PTHairline()
+                            oneRMInputRow(titre: "Squat", value: $squat1RM)
+                            PTHairline(leadingInset: 20)
+                            oneRMInputRow(titre: "Bench Press", value: $bench1RM)
+                            PTHairline(leadingInset: 20)
+                            oneRMInputRow(titre: "Deadlift", value: $deadlift1RM)
+                            PTHairline()
+                        }
+                    }
+                    
+                    Button(action: enregistrer) {
+                        Text("Enregistrer")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PTPrimaryPillButtonStyle())
+                    .padding(.horizontal, 20)
+                }
+                .padding(.vertical, 20)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(PTTheme.bg.ignoresSafeArea())
+            .navigationTitle("Modifier le bloc")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .preferredColorScheme(.dark)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") {
+                        dismiss()
+                    }
+                    .foregroundColor(PTTheme.textSecondary)
+                }
+            }
+            .onAppear {
+                nom = macroBloc.nom
+                squat1RM = macroBloc.squat1RM
+                bench1RM = macroBloc.bench1RM
+                deadlift1RM = macroBloc.deadlift1RM
+            }
+        }
+    }
+    
+    private func oneRMInputRow(titre: String, value: Binding<Double>) -> some View {
+        HStack {
+            Text(titre)
+                .font(.body.weight(.medium))
+                .foregroundColor(PTTheme.textPrimary)
+            
+            Spacer()
+            
+            HStack(spacing: 6) {
+                TextField("0", value: value, format: .number)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .font(.headline.weight(.bold).monospacedDigit())
+                    .foregroundColor(PTTheme.textPrimary)
+                    .frame(width: 82)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(PTTheme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(PTTheme.hairline, lineWidth: 0.5)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                
+                Text("kg")
+                    .font(.subheadline)
+                    .foregroundColor(PTTheme.textSecondary)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+    }
+    
+    private func enregistrer() {
+        let trimmed = nom.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            macroBloc.nom = trimmed
+        }
+        macroBloc.squat1RM = max(0, squat1RM)
+        macroBloc.bench1RM = max(0, bench1RM)
+        macroBloc.deadlift1RM = max(0, deadlift1RM)
+        try? modelContext.save()
+        HapticAndSoundManager.shared.triggerSetValidated()
+        dismiss()
     }
 }

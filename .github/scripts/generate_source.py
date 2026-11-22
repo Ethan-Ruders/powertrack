@@ -71,7 +71,7 @@ def build_source_payload(
                     "(Powerlifting) avec chronomètre intelligent et Live Activity."
                 ),
                 "iconURL": f"{pages_base}/icon.png",
-                "tintColor": "#FF7A00",
+                "tintColor": "#DE7A42",
                 "versions": [
                     {
                         "version": version,
@@ -106,13 +106,13 @@ def render_index_html(pages_base: str, version: str, build_version: str, downloa
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PowerTrack — Source SideStore</title>
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #111; color: #f5f5f5; max-width: 560px; margin: 48px auto; padding: 0 20px; line-height: 1.5; }}
-    .card {{ background: #1c1c1e; border-radius: 16px; padding: 24px; border: 1px solid #2c2c2e; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #09090B; color: #F5F5F7; max-width: 560px; margin: 48px auto; padding: 0 20px; line-height: 1.5; }}
+    .card {{ background: #111114; border-radius: 16px; padding: 24px; border: 1px solid rgba(255, 255, 255, 0.12); }}
     .header {{ display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }}
     .header img {{ width: 64px; height: 64px; border-radius: 14px; }}
-    .btn {{ display: inline-block; background: #ff7a00; color: #111; font-weight: 600; text-decoration: none; padding: 12px 18px; border-radius: 10px; margin-top: 8px; }}
-    code {{ display: block; background: #000; padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; margin: 12px 0; }}
-    a.muted {{ color: #ffa040; }}
+    .btn {{ display: inline-block; background: #F5F5F7; color: #09090B; font-weight: 700; text-decoration: none; padding: 12px 20px; border-radius: 999px; margin-top: 8px; }}
+    code {{ display: block; background: #09090B; border: 1px solid rgba(255, 255, 255, 0.09); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; margin: 12px 0; }}
+    a.muted {{ color: #DE7A42; }}
   </style>
 </head>
 <body>

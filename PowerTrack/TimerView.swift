@@ -118,3 +118,25 @@ struct TimerView: View {
         }
     }
 }
+
+/// Pile globale de bannières inférieures (Chrono de repos + Reprise de séance), affichable sur tous les écrans.
+struct PTBottomOverlayStack: View {
+    var activeSeance: Seance? = nil
+    @ObservedObject private var timerManager = TimerManager.shared
+    
+    var body: some View {
+        if timerManager.state != .inactive || activeSeance != nil {
+            VStack(spacing: 0) {
+                if timerManager.state != .inactive {
+                    TimerView(timerManager: timerManager)
+                }
+                if let seance = activeSeance {
+                    ResumeWorkoutBannerView(seance: seance)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+        }
+    }
+}

@@ -29,6 +29,9 @@ jobs:
       - name: Verify Xcode version
         run: xcodebuild -version
 
+      - name: Run Core Unit Tests
+        run: bash Tests/run_tests.sh
+
       - name: Build unsigned Release app
         run: |
           xcodebuild \

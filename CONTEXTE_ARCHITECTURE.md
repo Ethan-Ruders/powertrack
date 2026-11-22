@@ -27,26 +27,26 @@ Le projet utilise `PBXFileSystemSynchronizedRootGroup` dans `PowerTrack.xcodepro
   - `PowerTrackApp.swift` — Point d'entrée `@main`, configure `.modelContainer(for: MacroBloc.self)`.
   - `DesignSystem.swift` — Palette `PTTheme` (`#09090B` / `#F5F5F7` / `#DE7A42`), primitives éditoriales (`PTHairline`, `PTKicker`, `PTProgressHairline`), boutons capsule (`PTPrimaryPillButtonStyle`, `PTSecondaryPillButtonStyle`), formatage (`PTFormat`) et calculateur de disques (`PTBarbellPlateHelper`).
   - `ContentView.swift` — `TabView` à 2 onglets : **Programmation** (`BlocListView`) et **Performance** (`PerformanceDashboardView`).
-  - `models.swift` — Modèles SwiftData (`MacroBloc`, `Semaine`, `Seance`, `Exercice`, `Serie`), énumérations (`CategorieExercice`, `TypeEchauffementExercice`), état local `SeanceProgressTracker`, et moteur de charges RPE (`pourcentagePour`, `calculerCharge`).
+  - `models.swift` — Modèles SwiftData (`MacroBloc`, `Semaine`, `Seance`, `Exercice`, `Serie` avec `ordre` + `seriesTriees`), classification unifiée `MouvementParent`, scores `PowerliftingScoring` (`dotsMale`, `ipfGLMaleClassic`), suivi `SeanceProgressTracker`, et moteur RPE (`pourcentagePour`, `calculerCharge`).
   - `BlocListView.swift` — Liste des blocs, menu de création / import JSON coach, accès aux réglages serveur (badge file hors-ligne), suppression par menu contextuel, et bannière flottante `ResumeWorkoutBannerView`.
   - `BlocInitView.swift` — Formulaire entonnoir en 3 étapes (*1. Mouvements → 2. Variantes & Ratios → 3. 1RM & Option Test PR*) appelant `ProgramGenerator`.
   - `ProgramGenerator.swift` — Générateur de cycle de 4 semaines (*Volume RPE 6.5 → Accumulation RPE 7.5 → Intensification RPE 8 → Pic Contrôlé RPE 8.5*) avec option Semaine 5 (*Taper + Test PR en 1 journée*), 7 gabarits (`GabaritProgramme`, dont `fullSBD` en J1 DL / J2 Bench / J3 Squat+Var Bench / J4 SBD), `Bench Tempo` et calcul auto des charges à 2,5 kg près.
   - `ProgramJSONImporter.swift` & `ProgramImportSheet.swift` — Importateur JSON générique (format Coach v2 avec `indications` et séries détaillées, ou format tableau historique) avec prévisualisation et injection dans SwiftData.
   - `SemaineListView.swift` — Liste triée des semaines d'un `MacroBloc` + `ResumeWorkoutBannerView`.
   - `SeanceListView.swift` — Liste triée des séances d'une `Semaine` avec compteur de séries validées.
-  - `SeanceDetailView.swift` — Écran principal de séance en salle (`SeanceProgressHeaderView`, `ExerciceSectionHeaderView`, `BackoffAdaptationBannerView`, `SerieCompactRowView`, `CompactStepButton`, accès `SeanceExportSheet`, fin de séance).
+  - `SeanceDetailView.swift` — Écran principal de séance en salle (`SeanceProgressHeaderView` démarré à la 1re série validée, `ExerciceSectionHeaderView` avec rappel `Dernière fois` et édition/ajout/suppression, `BackoffAdaptationBannerView`, `SerieCompactRowView` avec steppers charge/reps/RPE et suppression, `ExerciceEditorSheet`, accès `SeanceExportSheet`, fin de séance).
   - `EtapeEchauffement.swift` — Calculateur et feuille modale d'échauffement (`genererPaliersEchauffement`, `EchauffementSheetView`).
-  - `SeanceSummarySheet.swift` — Modale de bilan en fin de séance (tonnage, meilleur e1RM, séries validées, durée réelle via `SeanceProgressTracker`, Top Sets vs RPE cible, accès direct à l'export & ressentis).
+  - `SeanceSummarySheet.swift` — Modale de bilan en fin de séance (tonnage, meilleur e1RM, séries validées, durée réelle, statut n8n + envoi direct, Top Sets vs RPE cible, accès `SeanceExportSheet`).
   - `TimerState.swift` — `TimerManager.shared` (`ObservableObject`, `@MainActor`) : calcul des durées min/max selon catégorie & RPE, horodatages absolus (`dateFinMin` / `dateFinMax`), resynchronisation `willEnterForegroundNotification`, notifications locales unifiées et pilotage de la Live Activity.
-  - `TimerView.swift` — Bandeau chrono flottant en bas de `SeanceDetailView` affichant le compte à rebours `tempsRestantMax` (blanc → vert au palier min → rouge à `00:00`), statut `Min` / `Prêt` / `Terminé`, `+30s`, `Passer`.
-  - `HapticAndSoundManager.swift` — Retours haptiques pré-chauffés (`selection`, `light`, `setValidated`, `PRValidated`) et session `AVAudioSession` `.ambient` avec `[.mixWithOthers, .duckOthers]` pour baisser temporairement Spotify/Apple Music sans la couper.
+  - `TimerView.swift` — Bandeau chrono flottant (`TimerView`) et conteneur global `PTBottomOverlayStack` partagé sur tous les écrans/onglets.
+  - `HapticAndSoundManager.swift` — Retours haptiques pré-chauffés et alerte sonore WAV synthétisée en mémoire via `AVAudioPlayer` (`.playback` + `[.mixWithOthers, .duckOthers]`, audible en mode silencieux sans couper Spotify/Apple Music).
   - `RestTimerAttributes.swift` — Définition `ActivityAttributes` partagée (cibles `PowerTrack` + `PowerTrackWidgetsExtension`), conforme `Sendable` avec propriété `timerRange`.
   - `RestTimerActivityManager.swift` — Gestionnaire `@MainActor` (`LiveActivityManager` aliasé) pour démarrer, prolonger (`+30s`) et clôturer proprement la Live Activity sans activité orpheline.
   - `RestTimerAppIntents.swift` — `AjouterTempsIntent` et `PasserReposIntent` (`LiveActivityIntent`) partagés entre les deux cibles et routés vers `TimerManager.shared`.
-  - `PerformanceDashboardView.swift` — Onglet Performance avec sélecteur multi-blocs (`selectedBlocID`), Total SBD estimé + répartition proportionnelle, graphique `AreaMark`/`LineMark` d'évolution e1RM (calcul via `Serie.calculerE1RM()`), tonnage hebdomadaire empilé par catégorie (`Compétition`, `Variante`, `Accessoire`), et bandeau RPE moyen hebdomadaire.
-  - `SeanceExportDTO.swift`, `SeanceExportSheet.swift` & `ExportSettingsView.swift` — Contrat JSON v2 (`SeanceExportDTO` avec cibles vs réel, durée réelle, `seanceId` idempotent, `RessentiSeanceDTO`), configuration webhook `n8n` + auth header, file d'attente hors-ligne, et copie/partage JSON local.
+  - `PerformanceDashboardView.swift` — Onglet Performance interactif (`.chartXSelection` sur e1RM et tonnage, filtre multi-blocs et Compétition/Variantes, Total SBD estimé + DOTS / IPF GL, bandeau RPE hebdo).
+  - `SeanceExportDTO.swift`, `SeanceExportSheet.swift`, `ExportSettingsView.swift` & `BackupManager.swift` — Contrat JSON v2 (`SeanceExportDTO`), token API chiffré dans le Trousseau iOS (`Keychain`), auto-synchro hors-ligne (`NWPathMonitor` + retour premier plan), badges de synchro, et sauvegarde/restauration complète locale (`.json`).
 
-- **Cible `PowerTrackWidgetsExtension`** (`com.ethanruders.PowerTrack.PowerTrackWidgets`, `IPHONEOS_DEPLOYMENT_TARGET = 27.0`, `NSSupportsLiveActivities = YES`) :
+- **Cible `PowerTrackWidgetsExtension`** (`com.ethanruders.PowerTrack.PowerTrackWidgets`, `IPHONEOS_DEPLOYMENT_TARGET = 26.5`, `NSSupportsLiveActivities = YES`) :
   - `PowerTrackWidgetsBundle.swift` — Bundle `@main` enregistrant `RestTimerLiveActivityWidget`.
   - `PowerTrackWidgetsLiveActivity.swift` — UI Écran verrouillé (`RestTimerLiveActivityView`) & Dynamic Island (états expanded, compact, minimal) avec compte à rebours natif `Text(timerInterval: context.state.timerRange)` et boutons interactifs `AjouterTempsIntent` (`+30s`) / `PasserReposIntent` (`Passer`).
 
@@ -60,7 +60,7 @@ MacroBloc (nom, dateDebut, squat1RM, bench1RM, deadlift1RM)
  └── [cascade] Semaine (numero, nom)
       └── [cascade] Seance (date, titre?)
            └── [cascade] Exercice (nom, categorie: CategorieExercice, indications?, ordre)
-                └── [cascade] Serie (repsCibles, rpeCible, chargeSaisie?, rpeSaisi?, estValidee)
+                └── [cascade] Serie (ordre, repsCibles, rpeCible, chargeSaisie?, rpeSaisi?, estValidee)
 ```
 
 ### Règles métier implémentées
@@ -113,10 +113,10 @@ Ces points ont été observés directement dans le code actuel et constituent d'
    - Résolu : `RestTimerAttributes.swift` et `RestTimerAppIntents.swift` (`LiveActivityIntent`) sont désormais partagés entre `PowerTrack` et `PowerTrackWidgetsExtension` via `PBXFileSystemSynchronizedBuildFileExceptionSet` (`WIDGET_EXTENSION`), et routés sur `TimerManager.shared` (notifications locales + ActivityKit + UI synchronisés).
 3. **Multi-blocs dans `PerformanceDashboardView.swift` (résolu) :**
    - Résolu : filtre multi-blocs (`selectedBlocID: PersistentIdentifier?`, tri `@Query` par `dateDebut` décroissant) et déduplication du calcul e1RM via `Serie.calculerE1RM()`.
-4. **Cohérence des Deployment Targets :**
-   - `PowerTrack` cible iOS `26.5` alors que `PowerTrackWidgetsExtension` cible `27.0` dans `project.pbxproj`. À aligner si besoin.
-5. **Tests automatisés :**
-   - Aucune cible `XCTest` / `Swift Testing` n'existe encore dans le projet (utile pour tester `ProgramGenerator`, `ProgramJSONImporter`, `calculerE1RM`, `calculerCharge`, `genererPaliersEchauffement`, et `SeanceExportDTO`).
+4. **Cohérence des Deployment Targets (résolu) :**
+   - Résolu : `PowerTrack` et `PowerTrackWidgetsExtension` ciblent tous deux `IPHONEOS_DEPLOYMENT_TARGET = 26.5`.
+5. **Tests automatisés (résolu) :**
+   - Résolu : suite de tests Swift dans `Tests/PowerTrackCoreTests.swift` exécutée via `Tests/run_tests.sh` (moteur RPE, e1RM, `Serie.ordre`, `MouvementParent`, DOTS/IPF GL, échauffements, 7 gabarits `ProgramGenerator`, `ProgramJSONImporter`, `ExportManager` et `BackupManager`) et intégrée dans `.github/workflows/build-ipa.yml`.
 6. **Cockpit Web Coach sur `Serveur-Linux` (piste future, après prise en main quotidienne) :**
    - Éventuelle mini web app Docker (`FastAPI` + front sombre/orange façon PowerTrack derrière `nginx-proxy-manager`) affichant les métriques/alertes depuis `postgres-force` + chat coach relié à une API LLM et aux scripts du repo `powerlifting-coach-skill` (avec historique des messages en BDD et export JSON direct vers `ProgramImportSheet`).
 

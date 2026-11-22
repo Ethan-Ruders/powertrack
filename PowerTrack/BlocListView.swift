@@ -11,7 +11,7 @@ import SwiftData
 struct BlocListView: View {
     @Environment(\.modelContext) private var modelContext
     
-    @Query(sort: \MacroBloc.nom) private var blocs: [MacroBloc]
+    @Query(sort: \MacroBloc.dateDebut, order: .reverse) private var blocs: [MacroBloc]
     @ObservedObject private var progressTracker = SeanceProgressTracker.shared
     @ObservedObject private var exportManager = ExportManager.shared
     
@@ -57,12 +57,7 @@ struct BlocListView: View {
             .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Programmation")
             .safeAreaInset(edge: .bottom) {
-                if let seanceActive = seanceEnCours {
-                    ResumeWorkoutBannerView(seance: seanceActive)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+                PTBottomOverlayStack(activeSeance: seanceEnCours)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

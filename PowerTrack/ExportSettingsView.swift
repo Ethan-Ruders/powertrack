@@ -6,16 +6,28 @@
 //
 
 import SwiftUI
+import SwiftData
+import UniformTypeIdentifiers
 
-/// Écran de configuration du webhook n8n (Serveur Linux) et gestion de la file d'export hors-ligne.
+/// Écran de configuration du webhook n8n (Serveur Linux), file hors-ligne et sauvegarde complète locale.
 struct ExportSettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @ObservedObject private var exportManager = ExportManager.shared
     
     @State private var isTesting = false
     @State private var isFlushing = false
     @State private var statusMessage: String? = nil
     @State private var statusIsSuccess = false
+    
+    // Sauvegarde / Restauration locale complète (.json)
+    @State private var backupDocument = PowerTrackJSONDocument()
+    @State private var isExportingBackup = false
+    @State private var isImportingBackup = false
+    @State private var pendingBackupToRestore: PowerTrackBackupDTO? = nil
+    @State private var showingRestoreConfirm = false
+    @State private var backupFeedbackMessage: String? = nil
+    @State private var backupFeedbackIsSuccess = true
     
     var body: some View {
         NavigationStack {
@@ -25,6 +37,7 @@ struct ExportSettingsView: View {
                     authSection
                     testAndStatusSection
                     offlineQueueSection
+                    localBackupSection
                 }
                 .padding(.vertical, 20)
             }
@@ -40,6 +53,51 @@ struct ExportSettingsView: View {
                         dismiss()
                     }
                     .foregroundColor(PTTheme.textSecondary)
+                }
+            }
+            .fileExporter(
+                isPresented: $isExportingBackup,
+                document: backupDocument,
+                contentType: .json,
+                defaultFilename: nomFichierSauvegarde()
+            ) { result in
+                switch result {
+                case .success:
+                    HapticAndSoundManager.shared.triggerSetValidated()
+                    backupFeedbackIsSuccess = true
+                    backupFeedbackMessage = "Sauvegarde complète exportée avec succès."
+                case .failure(let error):
+                    backupFeedbackIsSuccess = false
+                    backupFeedbackMessage = "Échec export sauvegarde : \(error.localizedDescription)"
+                }
+            }
+            .fileImporter(
+                isPresented: $isImportingBackup,
+                allowedContentTypes: [.json],
+                allowsMultipleSelection: false
+            ) { result in
+                chargerSauvegardePourRestauration(result)
+            }
+            .confirmationDialog(
+                "Restaurer la sauvegarde ?",
+                isPresented: $showingRestoreConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Ajouter aux blocs existants") {
+                    executerRestauration(replaceExisting: false)
+                }
+                Button("Remplacer tous les blocs existants", role: .destructive) {
+                    executerRestauration(replaceExisting: true)
+                }
+                Button("Annuler", role: .cancel) {
+                    pendingBackupToRestore = nil
+                }
+            } message: {
+                if let dto = pendingBackupToRestore {
+                    let totalSeances = dto.blocs.reduce(0) { t, b in
+                        t + b.semaines.reduce(0) { $0 + $1.seances.count }
+                    }
+                    Text("\(dto.blocs.count) bloc(s) · \(totalSeances) séance(s) · \(dto.ressentis.count) ressenti(s). Choisis si tu veux fusionner ou remplacer tes données locales.")
                 }
             }
         }
@@ -84,14 +142,14 @@ struct ExportSettingsView: View {
     
     private var authSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            PTKicker(text: "Authentification (optionnel)")
+            PTKicker(text: "Authentification (Trousseau iOS)")
                 .padding(.horizontal, 16)
             
             VStack(spacing: 0) {
                 PTHairline()
                 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Si ton webhook n8n vérifie un en-tête HTTP (Header Auth).")
+                    Text("En-tête HTTP vérifié par ton webhook n8n. La clé secrète est chiffrée dans le Trousseau iOS.")
                         .font(.caption)
                         .foregroundColor(PTTheme.textSecondary)
                     
@@ -147,21 +205,7 @@ struct ExportSettingsView: View {
             .disabled(!exportManager.hasValidWebhookURL || isTesting)
             
             if let message = statusMessage {
-                HStack(spacing: 10) {
-                    Image(systemName: statusIsSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(statusIsSuccess ? PTTheme.success : PTTheme.accent)
-                    Text(message)
-                        .font(.caption)
-                        .foregroundColor(PTTheme.textPrimary)
-                    Spacer()
-                }
-                .padding(12)
-                .background(PTTheme.surface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(PTTheme.hairline, lineWidth: 0.5)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                statusBanner(message: message, isSuccess: statusIsSuccess)
             }
         }
         .padding(.horizontal, 16)
@@ -186,7 +230,7 @@ struct ExportSettingsView: View {
                 PTHairline()
                 
                 if exportManager.pendingQueue.isEmpty {
-                    Text("Aucune séance en attente d'envoi.")
+                    Text("Aucune séance en attente. La file se vide automatiquement dès le retour réseau.")
                         .font(.caption)
                         .foregroundColor(PTTheme.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -249,7 +293,72 @@ struct ExportSettingsView: View {
         }
     }
     
-    // MARK: - Actions
+    private var localBackupSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PTKicker(text: "Sauvegarde complète locale (SideStore)")
+                .padding(.horizontal, 16)
+            
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Exporte tous tes blocs, séries validées et ressentis dans un fichier .json avant une réinstallation.")
+                        .font(.caption)
+                        .foregroundColor(PTTheme.textSecondary)
+                    
+                    HStack(spacing: 10) {
+                        Button(action: preparerExportSauvegarde) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "externaldrive.badge.plus")
+                                Text("Exporter (.json)")
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PTPrimaryPillButtonStyle())
+                        
+                        Button {
+                            isImportingBackup = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.down.doc")
+                                Text("Restaurer")
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PTSecondaryPillButtonStyle())
+                    }
+                    
+                    if let backupMsg = backupFeedbackMessage {
+                        statusBanner(message: backupMsg, isSuccess: backupFeedbackIsSuccess)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                
+                PTHairline()
+            }
+        }
+    }
+    
+    private func statusBanner(message: String, isSuccess: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundColor(isSuccess ? PTTheme.success : PTTheme.accent)
+            Text(message)
+                .font(.caption)
+                .foregroundColor(PTTheme.textPrimary)
+            Spacer()
+        }
+        .padding(12)
+        .background(PTTheme.surface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(PTTheme.hairline, lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+    
+    // MARK: - Actions Réseau & Sauvegarde
     
     private func lancerTestConnexion() {
         isTesting = true
@@ -284,5 +393,60 @@ struct ExportSettingsView: View {
                 statusMessage = "\(res.sent) envoyée(s), \(res.remaining) restante(s) : \(res.lastError ?? "erreur réseau")"
             }
         }
+    }
+    
+    private func preparerExportSauvegarde() {
+        do {
+            let data = try BackupManager.exportBackupJSON(from: modelContext)
+            backupDocument = PowerTrackJSONDocument(data: data)
+            isExportingBackup = true
+        } catch {
+            backupFeedbackIsSuccess = false
+            backupFeedbackMessage = "Impossible de générer la sauvegarde : \(error.localizedDescription)"
+        }
+    }
+    
+    private func chargerSauvegardePourRestauration(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let access = url.startAccessingSecurityScopedResource()
+            defer {
+                if access { url.stopAccessingSecurityScopedResource() }
+            }
+            do {
+                let data = try Data(contentsOf: url)
+                let parsed = try BackupManager.parseBackup(from: data)
+                pendingBackupToRestore = parsed
+                showingRestoreConfirm = true
+            } catch {
+                backupFeedbackIsSuccess = false
+                backupFeedbackMessage = "Fichier de sauvegarde invalide : \(error.localizedDescription)"
+            }
+        case .failure(let error):
+            backupFeedbackIsSuccess = false
+            backupFeedbackMessage = error.localizedDescription
+        }
+    }
+    
+    private func executerRestauration(replaceExisting: Bool) {
+        guard let backup = pendingBackupToRestore else { return }
+        pendingBackupToRestore = nil
+        do {
+            let summary = try BackupManager.restoreBackup(backup, into: modelContext, replaceExisting: replaceExisting)
+            HapticAndSoundManager.shared.triggerPRValidated()
+            backupFeedbackIsSuccess = true
+            backupFeedbackMessage = "Restauré : \(summary.blocsRestored) bloc(s), \(summary.seancesRestored) séance(s), \(summary.seriesValideesRestored) série(s) validée(s)."
+        } catch {
+            backupFeedbackIsSuccess = false
+            backupFeedbackMessage = "Erreur restauration : \(error.localizedDescription)"
+        }
+    }
+    
+    private func nomFichierSauvegarde() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return "powertrack-backup-\(formatter.string(from: Date()))"
     }
 }

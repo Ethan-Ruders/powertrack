@@ -4,8 +4,17 @@ import SwiftData
 struct SeanceListView: View {
     let semaine: Semaine
     
+    @ObservedObject private var progressTracker = SeanceProgressTracker.shared
+    @ObservedObject private var exportManager = ExportManager.shared
+    
     private var seancesTriees: [Seance] {
         semaine.seances.sorted { $0.date < $1.date }
+    }
+    
+    private var seanceEnCours: Seance? {
+        _ = progressTracker.lastUpdateToken
+        guard let bloc = semaine.macroBloc else { return nil }
+        return progressTracker.findActiveSeance(in: [bloc])
     }
     
     var body: some View {
@@ -28,6 +37,9 @@ struct SeanceListView: View {
         .navigationTitle(semaine.nom)
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
+        .safeAreaInset(edge: .bottom) {
+            PTBottomOverlayStack(activeSeance: seanceEnCours)
+        }
     }
     
     // MARK: - Sous-vues Éditoriales
@@ -59,6 +71,8 @@ struct SeanceListView: View {
         let total = seance.totalSeriesCount
         let isDone = total > 0 && validated == total
         let isInProgress = validated > 0 && !isDone
+        let isSynced = exportManager.isSeanceExported(seance)
+        let isPending = exportManager.isSeancePendingExport(seance)
         
         let statusColor: Color = isDone ? PTTheme.success : (isInProgress ? PTTheme.accent : PTTheme.textTertiary)
         let dateLabel = seance.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
@@ -85,6 +99,20 @@ struct SeanceListView: View {
             Spacer(minLength: 6)
             
             HStack(spacing: 10) {
+                if isSynced {
+                    HStack(spacing: 3) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("Sync")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundColor(PTTheme.textTertiary)
+                } else if isPending {
+                    Text("En file")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(PTTheme.accent)
+                }
+                
                 Circle()
                     .fill(statusColor)
                     .frame(width: 7, height: 7)

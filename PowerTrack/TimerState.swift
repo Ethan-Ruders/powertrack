@@ -91,7 +91,7 @@ final class TimerManager: ObservableObject {
         
         // 6. Démarrage de la Live Activity sur l'écran de verrouillage
         let dureeChrono = maxAlertDuration > 0 ? maxAlertDuration : minAlertDuration
-        let numSerie = (exercice.series.firstIndex(where: { $0.id == serie.id }) ?? 0) + 1
+        let numSerie = (exercice.seriesTriees.firstIndex(where: { $0.id == serie.id }) ?? 0) + 1
         LiveActivityManager.shared.startLiveActivity(
             nomExercice: exercice.nom,
             numeroSerie: numSerie,

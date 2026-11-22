@@ -6,13 +6,16 @@ import UIKit
 struct SeanceDetailView: View {
     let seance: Seance
     
+    @Environment(\.modelContext) private var modelContext
     @ObservedObject private var timerManager = TimerManager.shared
     @ObservedObject private var progressTracker = SeanceProgressTracker.shared
     
     @State private var exercicePourEchauffement: Exercice? = nil
+    @State private var exerciceAEditer: Exercice? = nil
+    @State private var isShowingAddExerciceSheet = false
     @State private var isShowingSummarySheet = false
     @State private var isShowingExportSheet = false
-    @State private var dateDebutSeance: Date = Date()
+    @State private var dateDebutSeance: Date? = nil
     @State private var prSerieIDs: Set<PersistentIdentifier> = []
     
     // Série dont le tiroir d'édition rapide est actuellement déplié
@@ -24,7 +27,7 @@ struct SeanceDetailView: View {
     
     private var prochaineSerieActive: Serie? {
         for exercice in exercicesTries {
-            if let firstUnvalidated = exercice.series.first(where: { !$0.estValidee }) {
+            if let firstUnvalidated = exercice.seriesTriees.first(where: { !$0.estValidee }) {
                 return firstUnvalidated
             }
         }
@@ -33,7 +36,7 @@ struct SeanceDetailView: View {
     
     private var prochainExerciceActif: Exercice? {
         exercicesTries.first { ex in
-            ex.series.contains { !$0.estValidee }
+            ex.seriesTriees.contains { !$0.estValidee }
         }
     }
     
@@ -48,14 +51,26 @@ struct SeanceDetailView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(exercicesTries.enumerated()), id: \.element.persistentModelID) { exIndex, exercice in
+                            let seriesTriees = exercice.seriesTriees
                             VStack(alignment: .leading, spacing: 0) {
                                 ExerciceSectionHeaderView(
                                     numeroExercice: exIndex + 1,
                                     exercice: exercice,
                                     meilleurE1RM: meilleurE1RMActuel(pour: exercice),
+                                    dernierePerformance: dernierePerformance(pour: exercice),
                                     onTapWarmup: {
                                         HapticAndSoundManager.shared.triggerLightImpact()
                                         exercicePourEchauffement = exercice
+                                    },
+                                    onAddSet: {
+                                        ajouterSerie(a: exercice)
+                                    },
+                                    onEditExercice: {
+                                        HapticAndSoundManager.shared.triggerLightImpact()
+                                        exerciceAEditer = exercice
+                                    },
+                                    onDeleteExercice: {
+                                        supprimerExercice(exercice)
                                     }
                                 )
                                 .id(exercice.persistentModelID)
@@ -71,7 +86,7 @@ struct SeanceDetailView: View {
                                 
                                 PTHairline()
                                 
-                                ForEach(Array(exercice.series.enumerated()), id: \.element.persistentModelID) { index, serie in
+                                ForEach(Array(seriesTriees.enumerated()), id: \.element.persistentModelID) { index, serie in
                                     let isActive = (prochaineSerieActive?.persistentModelID == serie.persistentModelID)
                                     let isExpanded = (expandedSerieID == serie.persistentModelID)
                                     let isPR = estNouveauPRTheorique(serie: serie, dans: exercice)
@@ -84,6 +99,7 @@ struct SeanceDetailView: View {
                                         isNextActiveSet: isActive,
                                         isExpanded: isExpanded,
                                         isTheoreticalPR: isPR,
+                                        canDeleteSerie: seriesTriees.count > 1,
                                         onTapRow: {
                                             HapticAndSoundManager.shared.triggerSelection()
                                             withAnimation(.snappy(duration: 0.25)) {
@@ -101,11 +117,14 @@ struct SeanceDetailView: View {
                                                 exercice: exercice,
                                                 scrollProxy: scrollProxy
                                             )
+                                        },
+                                        onDeleteSerie: {
+                                            supprimerSerie(serie, dans: exercice)
                                         }
                                     )
                                     .id(serie.persistentModelID)
                                     
-                                    if index < exercice.series.count - 1 {
+                                    if index < seriesTriees.count - 1 {
                                         PTHairline(leadingInset: 20)
                                     } else {
                                         PTHairline()
@@ -114,17 +133,32 @@ struct SeanceDetailView: View {
                             }
                         }
                         
-                        // Bouton de fin de séance sobre (capsule blanche)
-                        Button(action: {
-                            HapticAndSoundManager.shared.triggerPRValidated()
-                            timerManager.stopTimer()
-                            SeanceProgressTracker.shared.markSeanceClosed(seance)
-                            isShowingSummarySheet = true
-                        }) {
-                            Text("Terminer la séance")
+                        VStack(spacing: 10) {
+                            Button(action: {
+                                HapticAndSoundManager.shared.triggerLightImpact()
+                                isShowingAddExerciceSheet = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus")
+                                        .font(.caption.weight(.bold))
+                                    Text("Ajouter un exercice")
+                                }
                                 .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PTSecondaryPillButtonStyle())
+                            
+                            // Bouton de fin de séance sobre (capsule blanche)
+                            Button(action: {
+                                HapticAndSoundManager.shared.triggerPRValidated()
+                                timerManager.stopTimer()
+                                SeanceProgressTracker.shared.markSeanceClosed(seance)
+                                isShowingSummarySheet = true
+                            }) {
+                                Text("Terminer la séance")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PTPrimaryPillButtonStyle())
                         }
-                        .buttonStyle(PTPrimaryPillButtonStyle())
                         .padding(.horizontal, 20)
                         .padding(.top, 24)
                         .padding(.bottom, 32)
@@ -132,7 +166,7 @@ struct SeanceDetailView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onAppear {
-                    dateDebutSeance = SeanceProgressTracker.shared.ensureSessionStartDate(for: seance)
+                    dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
                     demanderAutorisationNotifications()
                     HapticAndSoundManager.shared.prepareGenerators()
                     
@@ -178,12 +212,26 @@ struct SeanceDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            TimerView(timerManager: timerManager)
+            PTBottomOverlayStack()
         }
         .sheet(item: $exercicePourEchauffement) { exerciceAechauffer in
             EchauffementSheetView(exercice: exerciceAechauffer)
                 .presentationDetents([.fraction(0.65), .large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $exerciceAEditer) { exercice in
+            ExerciceEditorSheet(
+                seance: seance,
+                exerciceToEdit: exercice,
+                nextOrder: exercice.ordre
+            )
+        }
+        .sheet(isPresented: $isShowingAddExerciceSheet) {
+            ExerciceEditorSheet(
+                seance: seance,
+                exerciceToEdit: nil,
+                nextOrder: (exercicesTries.last?.ordre ?? -1) + 1
+            )
         }
         .sheet(isPresented: $isShowingSummarySheet) {
             SeanceSummarySheet(seance: seance)
@@ -191,6 +239,72 @@ struct SeanceDetailView: View {
         .sheet(isPresented: $isShowingExportSheet) {
             SeanceExportSheet(seance: seance)
         }
+    }
+    
+    // MARK: - Actions d'Édition Libre (Séries & Exercices)
+    
+    private func ajouterSerie(a exercice: Exercice) {
+        HapticAndSoundManager.shared.triggerLightImpact()
+        let seriesTriees = exercice.seriesTriees
+        for (idx, s) in seriesTriees.enumerated() where s.ordre != idx {
+            s.ordre = idx
+        }
+        let template = seriesTriees.last
+        let nouvelle = Serie(
+            repsCibles: template?.repsCibles ?? 5,
+            rpeCible: template?.rpeCible ?? 7.5,
+            chargeSaisie: template?.chargeSaisie,
+            rpeSaisi: nil,
+            estValidee: false,
+            ordre: seriesTriees.count
+        )
+        nouvelle.exercice = exercice
+        withAnimation(.snappy(duration: 0.25)) {
+            exercice.series.append(nouvelle)
+            expandedSerieID = nouvelle.persistentModelID
+        }
+        try? modelContext.save()
+    }
+    
+    private func supprimerSerie(_ serie: Serie, dans exercice: Exercice) {
+        guard exercice.series.count > 1 else { return }
+        HapticAndSoundManager.shared.triggerLightImpact()
+        let deletedID = serie.persistentModelID
+        prSerieIDs.remove(deletedID)
+        if expandedSerieID == deletedID {
+            expandedSerieID = nil
+        }
+        withAnimation(.snappy(duration: 0.25)) {
+            exercice.series.removeAll { $0.persistentModelID == deletedID }
+            modelContext.delete(serie)
+            for (idx, s) in exercice.seriesTriees.enumerated() {
+                s.ordre = idx
+            }
+        }
+        SeanceProgressTracker.shared.recordSetUnvalidation(for: seance)
+        dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
+        try? modelContext.save()
+    }
+    
+    private func supprimerExercice(_ exercice: Exercice) {
+        HapticAndSoundManager.shared.triggerLightImpact()
+        let exID = exercice.persistentModelID
+        for s in exercice.series {
+            prSerieIDs.remove(s.persistentModelID)
+            if expandedSerieID == s.persistentModelID {
+                expandedSerieID = nil
+            }
+        }
+        withAnimation(.snappy(duration: 0.25)) {
+            seance.exercices.removeAll { $0.persistentModelID == exID }
+            modelContext.delete(exercice)
+            for (idx, ex) in seance.exercices.sorted(by: { $0.ordre < $1.ordre }).enumerated() {
+                ex.ordre = idx
+            }
+        }
+        SeanceProgressTracker.shared.recordSetUnvalidation(for: seance)
+        dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
+        try? modelContext.save()
     }
     
     // MARK: - Logique Métier (Validation, Propagation, PR, Auto-Scroll)
@@ -214,7 +328,11 @@ struct SeanceDetailView: View {
         }
         
         guard serie.estValidee else {
+            prSerieIDs.remove(serie.persistentModelID)
+            SeanceProgressTracker.shared.recordSetUnvalidation(for: seance)
+            dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
             HapticAndSoundManager.shared.triggerLightImpact()
+            try? modelContext.save()
             return
         }
         
@@ -224,9 +342,10 @@ struct SeanceDetailView: View {
         
         hideKeyboard()
         SeanceProgressTracker.shared.recordSetValidation(for: seance)
+        dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
         
         // Propagation intelligente vers la série N+1 si sa charge est vide
-        let series = exercice.series
+        let series = exercice.seriesTriees
         if index + 1 < series.count {
             let serieSuivante = series[index + 1]
             if serieSuivante.chargeSaisie == nil || serieSuivante.chargeSaisie == 0 {
@@ -244,10 +363,11 @@ struct SeanceDetailView: View {
             HapticAndSoundManager.shared.triggerSetValidated()
         }
         
+        try? modelContext.save()
         timerManager.startTimer(for: serie, exercice: exercice)
         
         // Si l'exercice est terminé, auto-scroll vers le prochain exercice actif
-        let toutesValideesDansExercice = exercice.series.allSatisfy(\.estValidee)
+        let toutesValideesDansExercice = series.allSatisfy(\.estValidee)
         if toutesValideesDansExercice, let nextEx = prochainExerciceActif {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                 withAnimation(.snappy) {
@@ -258,7 +378,7 @@ struct SeanceDetailView: View {
     }
     
     private func meilleurE1RMActuel(pour exercice: Exercice) -> Double? {
-        let e1rmsExercice = exercice.series.compactMap { s -> Double? in
+        let e1rmsExercice = exercice.seriesTriees.compactMap { s -> Double? in
             guard let charge = s.chargeSaisie, charge > 0 else { return nil }
             return s.calculerE1RM(charge: charge, reps: s.repsCibles, rpe: s.rpeSaisi ?? s.rpeCible)
         }
@@ -267,6 +387,43 @@ struct SeanceDetailView: View {
         }
         let hist = meilleurE1RMPrecedent(pour: exercice, excluant: nil)
         return hist > 0 ? hist : nil
+    }
+    
+    private func dernierePerformance(pour exercice: Exercice) -> String? {
+        guard let bloc = seance.semaine?.macroBloc else { return nil }
+        let cleCible = exercice.cleComparaisonPR
+        
+        var seancesCandidates: [Seance] = []
+        for sem in bloc.semaines {
+            for s in sem.seances where s.persistentModelID != seance.persistentModelID && s.date <= seance.date {
+                seancesCandidates.append(s)
+            }
+        }
+        seancesCandidates.sort { $0.date > $1.date }
+        
+        for candidate in seancesCandidates {
+            let exCorrespondants = candidate.exercices.filter { $0.cleComparaisonPR == cleCible }
+            var bestSerie: Serie? = nil
+            var bestScore: Double = 0
+            
+            for ex in exCorrespondants {
+                for s in ex.seriesTriees where s.estValidee {
+                    guard let charge = s.chargeSaisie, charge > 0 else { continue }
+                    let score = s.calculerE1RM() ?? charge
+                    if bestSerie == nil || score > bestScore || (score == bestScore && charge > (bestSerie?.chargeSaisie ?? 0)) {
+                        bestSerie = s
+                        bestScore = score
+                    }
+                }
+            }
+            
+            if let best = bestSerie, let charge = best.chargeSaisie {
+                let rpe = best.rpeSaisi ?? best.rpeCible
+                return "Dernière fois · \(PTFormat.weight(charge)) kg × \(best.repsCibles) @ \(PTFormat.rpe(rpe))"
+            }
+        }
+        
+        return nil
     }
     
     private func estUnTopSet(serie: Serie, index: Int, dans exercice: Exercice) -> Bool {
@@ -308,21 +465,26 @@ struct SeanceDetailView: View {
     
     private func meilleurE1RMPrecedent(pour exercice: Exercice, excluant serieExclue: Serie?) -> Double {
         var maxE1RM: Double = 0.0
-        let nomCible = racineNomMouvement(exercice.nom)
+        let cleCible = exercice.cleComparaisonPR
         
         if let bloc = seance.semaine?.macroBloc {
-            if nomCible.contains("squat") && bloc.squat1RM > 0 {
-                maxE1RM = max(maxE1RM, bloc.squat1RM)
-            } else if nomCible.contains("bench") && bloc.bench1RM > 0 {
-                maxE1RM = max(maxE1RM, bloc.bench1RM)
-            } else if nomCible.contains("deadlift") && bloc.deadlift1RM > 0 {
-                maxE1RM = max(maxE1RM, bloc.deadlift1RM)
+            if exercice.estMouvementCompetitionPur {
+                switch exercice.mouvementParent {
+                case .squat where bloc.squat1RM > 0:
+                    maxE1RM = max(maxE1RM, bloc.squat1RM)
+                case .bench where bloc.bench1RM > 0:
+                    maxE1RM = max(maxE1RM, bloc.bench1RM)
+                case .deadlift where bloc.deadlift1RM > 0:
+                    maxE1RM = max(maxE1RM, bloc.deadlift1RM)
+                default:
+                    break
+                }
             }
             
             for sem in bloc.semaines {
                 for s in sem.seances {
-                    for ex in s.exercices where racineNomMouvement(ex.nom) == nomCible {
-                        for ser in ex.series where ser.estValidee && ser.persistentModelID != serieExclue?.persistentModelID {
+                    for ex in s.exercices where ex.cleComparaisonPR == cleCible {
+                        for ser in ex.seriesTriees where ser.estValidee && ser.persistentModelID != serieExclue?.persistentModelID {
                             if let e1rm = ser.calculerE1RM() {
                                 maxE1RM = max(maxE1RM, e1rm)
                             }
@@ -335,32 +497,26 @@ struct SeanceDetailView: View {
         return maxE1RM
     }
     
-    private func racineNomMouvement(_ nom: String) -> String {
-        let lower = nom.lowercased()
-        if lower.contains("bench") || lower.contains("développé couché") { return "bench" }
-        if lower.contains("squat") { return "squat" }
-        if lower.contains("deadlift") || lower.contains("soulevé de terre") { return "deadlift" }
-        return lower
-    }
-    
     private func detecterDepassementRPETopSet(pour exercice: Exercice) -> Double? {
         guard exercice.categorie == .competition || exercice.nom.lowercased().contains("back-off") else {
             return nil
         }
-        guard exercice.series.contains(where: { !$0.estValidee }) else {
+        let seriesTriees = exercice.seriesTriees
+        guard seriesTriees.contains(where: { !$0.estValidee }) else {
             return nil
         }
         
-        if let premiereSerie = exercice.series.first,
+        if let premiereSerie = seriesTriees.first,
            premiereSerie.estValidee,
            let rpeReel = premiereSerie.rpeSaisi {
             let delta = rpeReel - premiereSerie.rpeCible
             if delta >= 1.0 { return delta }
         }
         
-        let racine = racineNomMouvement(exercice.nom)
-        for exPrecedent in exercicesTries where exPrecedent.ordre < exercice.ordre && racineNomMouvement(exPrecedent.nom) == racine {
-            for s in exPrecedent.series where s.estValidee {
+        let parent = exercice.mouvementParent
+        guard parent != .autre else { return nil }
+        for exPrecedent in exercicesTries where exPrecedent.ordre < exercice.ordre && exPrecedent.mouvementParent == parent {
+            for s in exPrecedent.seriesTriees where s.estValidee {
                 if let rpeReel = s.rpeSaisi {
                     let delta = rpeReel - s.rpeCible
                     if delta >= 1.0 { return delta }
@@ -373,12 +529,13 @@ struct SeanceDetailView: View {
     private func appliquerAllegementBackoffs(pour exercice: Exercice, reductionKg: Double) {
         HapticAndSoundManager.shared.triggerSelection()
         withAnimation(.snappy) {
-            for serie in exercice.series where !serie.estValidee {
+            for serie in exercice.seriesTriees where !serie.estValidee {
                 if let chargeActuelle = serie.chargeSaisie {
                     serie.chargeSaisie = max(0, chargeActuelle - reductionKg)
                 }
             }
         }
+        try? modelContext.save()
     }
     
     private func demanderAutorisationNotifications() {
@@ -392,7 +549,11 @@ struct ExerciceSectionHeaderView: View {
     let numeroExercice: Int
     let exercice: Exercice
     let meilleurE1RM: Double?
+    var dernierePerformance: String? = nil
     let onTapWarmup: () -> Void
+    var onAddSet: () -> Void = {}
+    var onEditExercice: () -> Void = {}
+    var onDeleteExercice: () -> Void = {}
     
     private var labelCategorie: String {
         let num = String(format: "%02d", numeroExercice)
@@ -415,7 +576,7 @@ struct ExerciceSectionHeaderView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 PTKicker(text: labelCategorie)
                 
                 Spacer(minLength: 6)
@@ -425,6 +586,25 @@ struct ExerciceSectionHeaderView: View {
                         .font(.caption.weight(.semibold).monospacedDigit())
                         .foregroundColor(PTTheme.accent)
                         .lineLimit(1)
+                }
+                
+                Menu {
+                    Button(action: onAddSet) {
+                        Label("Ajouter une série", systemImage: "plus")
+                    }
+                    Button(action: onEditExercice) {
+                        Label("Modifier l'exercice", systemImage: "pencil")
+                    }
+                    Divider()
+                    Button(role: .destructive, action: onDeleteExercice) {
+                        Label("Supprimer l'exercice", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(PTTheme.textTertiary)
+                        .frame(width: 26, height: 22)
+                        .contentShape(Rectangle())
                 }
             }
             
@@ -439,6 +619,13 @@ struct ExerciceSectionHeaderView: View {
                     .font(.caption)
                     .foregroundColor(PTTheme.textSecondary)
                     .lineLimit(2)
+            }
+            
+            if let derniere = dernierePerformance {
+                Text(derniere)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(PTTheme.textTertiary)
+                    .lineLimit(1)
             }
             
             if exercice.necessiteEchauffement {
@@ -479,8 +666,10 @@ struct SerieCompactRowView: View {
     let isNextActiveSet: Bool
     let isExpanded: Bool
     let isTheoreticalPR: Bool
+    var canDeleteSerie: Bool = false
     let onTapRow: () -> Void
     let onValidateSerie: () -> Void
+    var onDeleteSerie: (() -> Void)? = nil
     
     private let rpeOptions: [Double] = [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
     
@@ -582,20 +771,20 @@ struct SerieCompactRowView: View {
             .padding(.horizontal, 20)
             .frame(minHeight: 54)
             
-            // Tiroir d'édition rapide
+            // Tiroir d'édition rapide (Charge, RPE, Répétitions, Suppression)
             if isExpanded {
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         CompactStepButton(
                             label: "-2.5",
                             onTap: { ajusterCharge(-2.5) },
-                            onLongOrDouble: { ajusterCharge(-5.0) }
+                            onLongPress: { ajusterCharge(-5.0) }
                         )
                         
                         CompactStepButton(
                             label: "+2.5",
                             onTap: { ajusterCharge(2.5) },
-                            onLongOrDouble: { ajusterCharge(5.0) }
+                            onLongPress: { ajusterCharge(5.0) }
                         )
                         
                         Rectangle()
@@ -628,6 +817,62 @@ struct SerieCompactRowView: View {
                             }
                         }
                     }
+                    
+                    HStack(spacing: 8) {
+                        Button(action: { ajusterReps(-1) }) {
+                            Text("-1 rep")
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundColor(PTTheme.textPrimary)
+                                .padding(.horizontal, 10)
+                                .frame(height: 28)
+                                .background(PTTheme.surfaceElevated)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Text("\(serie.repsCibles) \(serie.repsCibles > 1 ? "reps" : "rep")")
+                            .font(.caption.weight(.bold).monospacedDigit())
+                            .foregroundColor(PTTheme.textSecondary)
+                            .frame(minWidth: 54, alignment: .center)
+                        
+                        Button(action: { ajusterReps(1) }) {
+                            Text("+1 rep")
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundColor(PTTheme.textPrimary)
+                                .padding(.horizontal, 10)
+                                .frame(height: 28)
+                                .background(PTTheme.surfaceElevated)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Spacer()
+                        
+                        if canDeleteSerie, let onDeleteSerie {
+                            Button(role: .destructive, action: onDeleteSerie) {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .foregroundColor(PTTheme.danger)
+                                    .frame(width: 30, height: 28)
+                                    .background(PTTheme.surfaceElevated)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                            .stroke(PTTheme.hairline, lineWidth: 0.5)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Supprimer la série")
+                        }
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
@@ -655,14 +900,19 @@ struct SerieCompactRowView: View {
         let base = serie.chargeSaisie ?? 0.0
         serie.chargeSaisie = max(0.0, base + delta)
     }
+    
+    private func ajusterReps(_ delta: Int) {
+        HapticAndSoundManager.shared.triggerSelection()
+        serie.repsCibles = max(1, serie.repsCibles + delta)
+    }
 }
 
-// MARK: - Bouton Stepper Compact
+// MARK: - Bouton Stepper Compact (Tap instantané ±2.5 kg, Appui long ±5 kg)
 
 struct CompactStepButton: View {
     let label: String
     let onTap: () -> Void
-    let onLongOrDouble: () -> Void
+    let onLongPress: () -> Void
     
     var body: some View {
         Text(label)
@@ -678,14 +928,11 @@ struct CompactStepButton: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .contentShape(Rectangle())
-            .highPriorityGesture(
-                TapGesture(count: 2).onEnded { onLongOrDouble() }
-            )
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.4).onEnded { _ in onLongOrDouble() }
-            )
             .onTapGesture {
                 onTap()
+            }
+            .onLongPressGesture(minimumDuration: 0.35) {
+                onLongPress()
             }
     }
 }
@@ -694,7 +941,7 @@ struct CompactStepButton: View {
 
 struct SeanceProgressHeaderView: View {
     let seance: Seance
-    let dateDebutSeance: Date
+    let dateDebutSeance: Date?
     
     private var totalSeries: Int { seance.totalSeriesCount }
     private var seriesValidees: Int { seance.validatedSeriesCount }
@@ -710,10 +957,17 @@ struct SeanceProgressHeaderView: View {
                 
                 Spacer()
                 
-                TimelineView(.periodic(from: dateDebutSeance, by: 1.0)) { context in
-                    Text(formatDuration(from: dateDebutSeance, to: context.date))
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundColor(PTTheme.textSecondary)
+                if let start = dateDebutSeance {
+                    TimelineView(.periodic(from: start, by: 1.0)) { context in
+                        Text(formatDuration(from: start, to: context.date))
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundColor(PTTheme.textSecondary)
+                            .lineLimit(1)
+                    }
+                } else {
+                    Text("Prêt")
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(PTTheme.textTertiary)
                         .lineLimit(1)
                 }
             }
@@ -738,6 +992,265 @@ struct SeanceProgressHeaderView: View {
         } else {
             return String(format: "%02d:%02d", minutes, seconds)
         }
+    }
+}
+
+// MARK: - Modale Ajout / Modification d'Exercice
+
+struct ExerciceEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    
+    let seance: Seance
+    let exerciceToEdit: Exercice?
+    let nextOrder: Int
+    
+    @State private var nom = ""
+    @State private var categorie: CategorieExercice = .polyarticulaire
+    @State private var indications = ""
+    @State private var nbSeries = 3
+    @State private var repsCibles = 8
+    @State private var rpeCible = 7.5
+    @State private var chargeCible: Double? = nil
+    
+    private var isEditing: Bool { exerciceToEdit != nil }
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        PTKicker(text: "Exercice")
+                            .padding(.horizontal, 20)
+                        
+                        VStack(spacing: 0) {
+                            PTHairline()
+                            TextField("Nom de l'exercice", text: $nom)
+                                .font(.body.weight(.semibold))
+                                .foregroundColor(PTTheme.textPrimary)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 14)
+                                .background(PTTheme.surface)
+                            PTHairline(leadingInset: 20)
+                            TextField("Indications techniques (optionnel)", text: $indications, axis: .vertical)
+                                .lineLimit(1...3)
+                                .font(.subheadline)
+                                .foregroundColor(PTTheme.textPrimary)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(PTTheme.surface)
+                            PTHairline()
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        PTKicker(text: "Catégorie")
+                            .padding(.horizontal, 20)
+                        
+                        HStack(spacing: 8) {
+                            categoriePill("Compétition", value: .competition)
+                            categoriePill("Polyarticulaire", value: .polyarticulaire)
+                            categoriePill("Isolation", value: .isolation)
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    if !isEditing {
+                        VStack(alignment: .leading, spacing: 8) {
+                            PTKicker(text: "Séries initiales")
+                                .padding(.horizontal, 20)
+                            
+                            VStack(spacing: 0) {
+                                PTHairline()
+                                integerStepperRow(label: "Séries", value: $nbSeries, range: 1...8)
+                                PTHairline(leadingInset: 20)
+                                integerStepperRow(label: "Répétitions", value: $repsCibles, range: 1...25)
+                                PTHairline(leadingInset: 20)
+                                
+                                HStack {
+                                    Text("RPE cible")
+                                        .font(.subheadline)
+                                        .foregroundColor(PTTheme.textSecondary)
+                                    Spacer()
+                                    HStack(spacing: 10) {
+                                        stepperMiniButton("-") {
+                                            rpeCible = max(5.0, rpeCible - 0.5)
+                                        }
+                                        Text("@\(PTFormat.rpe(rpeCible))")
+                                            .font(.subheadline.weight(.bold).monospacedDigit())
+                                            .foregroundColor(PTTheme.textPrimary)
+                                            .frame(minWidth: 44)
+                                        stepperMiniButton("+") {
+                                            rpeCible = min(10.0, rpeCible + 0.5)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                
+                                PTHairline(leadingInset: 20)
+                                
+                                HStack {
+                                    Text("Charge (optionnel)")
+                                        .font(.subheadline)
+                                        .foregroundColor(PTTheme.textSecondary)
+                                    Spacer()
+                                    HStack(spacing: 6) {
+                                        TextField("Auto", value: $chargeCible, format: .number)
+                                            .keyboardType(.decimalPad)
+                                            .multilineTextAlignment(.trailing)
+                                            .font(.subheadline.weight(.bold).monospacedDigit())
+                                            .foregroundColor(PTTheme.textPrimary)
+                                            .frame(width: 72)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 6)
+                                            .background(PTTheme.surface)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                    .stroke(PTTheme.hairline, lineWidth: 0.5)
+                                            )
+                                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        Text("kg")
+                                            .font(.caption)
+                                            .foregroundColor(PTTheme.textTertiary)
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                
+                                PTHairline()
+                            }
+                        }
+                    }
+                    
+                    Button(action: sauvegarder) {
+                        Text(isEditing ? "Enregistrer les modifications" : "Ajouter à la séance")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PTPrimaryPillButtonStyle(isDisabled: nom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                    .disabled(nom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(.horizontal, 20)
+                }
+                .padding(.vertical, 20)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(PTTheme.bg.ignoresSafeArea())
+            .navigationTitle(isEditing ? "Modifier l'exercice" : "Nouvel exercice")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .preferredColorScheme(.dark)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") { dismiss() }
+                        .foregroundColor(PTTheme.textSecondary)
+                }
+            }
+            .onAppear {
+                if let ex = exerciceToEdit {
+                    nom = ex.nom
+                    categorie = ex.categorie
+                    indications = ex.indications ?? ""
+                }
+            }
+        }
+    }
+    
+    private func categoriePill(_ titre: String, value: CategorieExercice) -> some View {
+        let isSelected = (categorie == value)
+        return Button {
+            HapticAndSoundManager.shared.triggerSelection()
+            categorie = value
+        } label: {
+            Text(titre)
+                .font(.caption.weight(isSelected ? .bold : .medium))
+                .foregroundColor(isSelected ? PTTheme.bg : PTTheme.textSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(isSelected ? PTTheme.textPrimary : PTTheme.surface)
+                .overlay(
+                    Capsule()
+                        .stroke(isSelected ? Color.clear : PTTheme.hairline, lineWidth: 0.5)
+                )
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func integerStepperRow(label: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(PTTheme.textSecondary)
+            Spacer()
+            HStack(spacing: 10) {
+                stepperMiniButton("-") {
+                    value.wrappedValue = max(range.lowerBound, value.wrappedValue - 1)
+                }
+                Text("\(value.wrappedValue)")
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .foregroundColor(PTTheme.textPrimary)
+                    .frame(minWidth: 32)
+                stepperMiniButton("+") {
+                    value.wrappedValue = min(range.upperBound, value.wrappedValue + 1)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+    }
+    
+    private func stepperMiniButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            HapticAndSoundManager.shared.triggerSelection()
+            action()
+        } label: {
+            Text(label)
+                .font(.subheadline.weight(.bold))
+                .foregroundColor(PTTheme.textPrimary)
+                .frame(width: 30, height: 28)
+                .background(PTTheme.surfaceElevated)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func sauvegarder() {
+        let nomNettoye = nom.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !nomNettoye.isEmpty else { return }
+        let indic = indications.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if let ex = exerciceToEdit {
+            ex.nom = nomNettoye
+            ex.categorie = categorie
+            ex.indications = indic.isEmpty ? nil : indic
+        } else {
+            let ex = Exercice(
+                nom: nomNettoye,
+                categorie: categorie,
+                indications: indic.isEmpty ? nil : indic,
+                ordre: nextOrder
+            )
+            ex.seance = seance
+            for idx in 0..<nbSeries {
+                let s = Serie(
+                    repsCibles: repsCibles,
+                    rpeCible: rpeCible,
+                    chargeSaisie: chargeCible,
+                    ordre: idx
+                )
+                s.exercice = ex
+                ex.series.append(s)
+            }
+            seance.exercices.append(ex)
+        }
+        
+        try? modelContext.save()
+        HapticAndSoundManager.shared.triggerSetValidated()
+        dismiss()
     }
 }
 

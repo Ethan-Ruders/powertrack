@@ -554,8 +554,8 @@ enum ProgramGenerator {
                 ordre: idx
             )
             ex.seance = s1
-            for _ in 0..<2 {
-                let s = Serie(repsCibles: 3, rpeCible: 5.0, chargeSaisie: charge)
+            for serieIdx in 0..<2 {
+                let s = Serie(repsCibles: 3, rpeCible: 5.0, chargeSaisie: charge, ordre: serieIdx)
                 s.exercice = ex
                 ex.series.append(s)
             }
@@ -589,8 +589,8 @@ enum ProgramGenerator {
                 ordre: idx
             )
             ex.seance = s2
-            for _ in 0..<2 {
-                let s = Serie(repsCibles: 1, rpeCible: 5.5, chargeSaisie: charge)
+            for serieIdx in 0..<2 {
+                let s = Serie(repsCibles: 1, rpeCible: 5.5, chargeSaisie: charge, ordre: serieIdx)
                 s.exercice = ex
                 ex.series.append(s)
             }
@@ -618,8 +618,8 @@ enum ProgramGenerator {
                 (9.0, deuxieme),
                 (10.0, prTarget)
             ]
-            for t in tentatives {
-                let s = Serie(repsCibles: 1, rpeCible: t.rpe, chargeSaisie: t.charge)
+            for (serieIdx, t) in tentatives.enumerated() {
+                let s = Serie(repsCibles: 1, rpeCible: t.rpe, chargeSaisie: t.charge, ordre: serieIdx)
                 s.exercice = ex
                 ex.series.append(s)
             }
@@ -669,14 +669,14 @@ enum ProgramGenerator {
         }
         
         let chargeTop = rm > 0 ? arrondirCharge(calculerCharge(rm: rm, reps: plan.repsTop, rpe: plan.rpeTop)) : nil
-        let serieTop = Serie(repsCibles: plan.repsTop, rpeCible: plan.rpeTop, chargeSaisie: chargeTop)
+        let serieTop = Serie(repsCibles: plan.repsTop, rpeCible: plan.rpeTop, chargeSaisie: chargeTop, ordre: 0)
         serieTop.exercice = ex
         ex.series.append(serieTop)
         
         if plan.setsBackoff > 0 {
             let chargeBackoff = chargeTop.map { arrondirCharge($0 * plan.ratioBackoff) }
-            for _ in 0..<plan.setsBackoff {
-                let serieBack = Serie(repsCibles: plan.repsBackoff, rpeCible: plan.rpeBackoff, chargeSaisie: chargeBackoff)
+            for backoffIdx in 1...plan.setsBackoff {
+                let serieBack = Serie(repsCibles: plan.repsBackoff, rpeCible: plan.rpeBackoff, chargeSaisie: chargeBackoff, ordre: backoffIdx)
                 serieBack.exercice = ex
                 ex.series.append(serieBack)
             }
@@ -714,8 +714,8 @@ enum ProgramGenerator {
         
         let rpeCible = max(5.5, min(8.5, planBase.rpe + rpeOffset))
         let charge = rm > 0 ? arrondirCharge(calculerCharge(rm: rm, reps: planBase.reps, rpe: rpeCible)) : nil
-        for _ in 0..<planBase.sets {
-            let serie = Serie(repsCibles: planBase.reps, rpeCible: rpeCible, chargeSaisie: charge)
+        for serieIdx in 0..<planBase.sets {
+            let serie = Serie(repsCibles: planBase.reps, rpeCible: rpeCible, chargeSaisie: charge, ordre: serieIdx)
             serie.exercice = ex
             ex.series.append(serie)
         }
@@ -762,8 +762,8 @@ enum ProgramGenerator {
         }
         
         let charge = rmParent > 0 ? arrondirCharge(calculerCharge(rm: rmParent, reps: plan.reps, rpe: plan.rpe, ratioVariante: ratio)) : nil
-        for _ in 0..<plan.sets {
-            let serie = Serie(repsCibles: plan.reps, rpeCible: plan.rpe, chargeSaisie: charge)
+        for serieIdx in 0..<plan.sets {
+            let serie = Serie(repsCibles: plan.reps, rpeCible: plan.rpe, chargeSaisie: charge, ordre: serieIdx)
             serie.exercice = ex
             ex.series.append(serie)
         }
@@ -786,8 +786,8 @@ enum ProgramGenerator {
         // En S4 (Pic Contrôlé), allègement d'une série et -0.5 RPE sur les accessoires
         let nbSeries = (numSemaine >= 4) ? max(2, series - 1) : series
         let rpeCible = (numSemaine >= 4) ? max(6.0, rpe - 0.5) : rpe
-        for _ in 0..<nbSeries {
-            let serie = Serie(repsCibles: reps, rpeCible: rpeCible, chargeSaisie: nil)
+        for serieIdx in 0..<nbSeries {
+            let serie = Serie(repsCibles: reps, rpeCible: rpeCible, chargeSaisie: nil, ordre: serieIdx)
             serie.exercice = ex
             ex.series.append(serie)
         }

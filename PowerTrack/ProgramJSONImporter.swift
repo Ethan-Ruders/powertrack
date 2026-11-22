@@ -205,13 +205,14 @@ enum ProgramJSONImporter {
                     )
                     exercice.seance = seance
                     
-                    for serieDTO in exerciseDTO.resolvedSeries() {
+                    for (serieIndex, serieDTO) in exerciseDTO.resolvedSeries().enumerated() {
                         let serie = Serie(
                             repsCibles: serieDTO.reps,
                             rpeCible: serieDTO.rpe,
                             chargeSaisie: serieDTO.weight,
                             rpeSaisi: nil,
-                            estValidee: false
+                            estValidee: false,
+                            ordre: serieIndex
                         )
                         serie.exercice = exercice
                         exercice.series.append(serie)

@@ -8,8 +8,8 @@
 import Foundation
 import ActivityKit
 
-public struct RestTimerAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
+nonisolated public struct RestTimerAttributes: ActivityAttributes, Sendable {
+    nonisolated public struct ContentState: Codable, Hashable, Sendable {
         public var nomExercice: String
         public var numeroSerie: Int
         public var dateDebutRepos: Date
@@ -28,6 +28,11 @@ public struct RestTimerAttributes: ActivityAttributes {
             self.dateDebutRepos = dateDebutRepos
             self.dateFinRepos = dateFinRepos
             self.dureeTotale = dureeTotale
+        }
+        
+        /// Plage sécurisée évitant un intervalle invalide (`dateDebut > dateFin`) dans SwiftUI `timerInterval`.
+        public var timerRange: ClosedRange<Date> {
+            dateDebutRepos...max(dateDebutRepos, dateFinRepos)
         }
     }
     

@@ -6,7 +6,7 @@ import UIKit
 struct SeanceDetailView: View {
     let seance: Seance
     
-    @StateObject private var timerManager = TimerManager()
+    @ObservedObject private var timerManager = TimerManager.shared
     @ObservedObject private var progressTracker = SeanceProgressTracker.shared
     
     @State private var exercicePourEchauffement: Exercice? = nil

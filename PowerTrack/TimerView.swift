@@ -17,14 +17,14 @@ struct TimerView: View {
                     .fill(couleurChrono)
                     .frame(width: 8, height: 8)
                 
-                Text(formatTime(timerManager.tempsEcoule))
+                Text(formatTime(timerManager.tempsRestantMax))
                     .font(.system(size: 19, weight: .bold).monospacedDigit())
                     .foregroundColor(couleurChrono)
                     .lineLimit(1)
                 
-                Text("Repos")
-                    .font(.caption.weight(.medium))
-                    .foregroundColor(PTTheme.textSecondary)
+                Text(labelStatut)
+                    .font(.caption.weight(.medium).monospacedDigit())
+                    .foregroundColor(couleurStatut)
                     .lineLimit(1)
                 
                 Spacer(minLength: 6)
@@ -80,15 +80,38 @@ struct TimerView: View {
     }
     
     private func formatTime(_ interval: TimeInterval) -> String {
-        let minutes = Int(interval) / 60
-        let seconds = Int(interval) % 60
+        let totalSeconds = Int(ceil(max(0, interval)))
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
     
-    private var couleurChrono: Color {
-        if timerManager.maxAlertDuration > 0 && timerManager.tempsEcoule >= timerManager.maxAlertDuration {
+    private var labelStatut: String {
+        if timerManager.tempsRestantMax <= 0 {
+            return "Terminé"
+        } else if timerManager.minAlertDuration > 0 && timerManager.tempsRestantMin <= 0 {
+            return "Prêt"
+        } else if timerManager.minAlertDuration > 0 && timerManager.minAlertDuration < timerManager.maxAlertDuration {
+            return "Min \(formatTime(timerManager.tempsRestantMin))"
+        } else {
+            return "Repos"
+        }
+    }
+    
+    private var couleurStatut: Color {
+        if timerManager.tempsRestantMax <= 0 {
             return PTTheme.danger
-        } else if timerManager.minAlertDuration > 0 && timerManager.tempsEcoule >= timerManager.minAlertDuration {
+        } else if timerManager.minAlertDuration > 0 && timerManager.tempsRestantMin <= 0 {
+            return PTTheme.success
+        } else {
+            return PTTheme.textSecondary
+        }
+    }
+    
+    private var couleurChrono: Color {
+        if timerManager.tempsRestantMax <= 0 {
+            return PTTheme.danger
+        } else if timerManager.minAlertDuration > 0 && timerManager.tempsRestantMin <= 0 {
             return PTTheme.success
         } else {
             return PTTheme.textPrimary

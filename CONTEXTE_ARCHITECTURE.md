@@ -37,18 +37,18 @@ Le projet utilise `PBXFileSystemSynchronizedRootGroup` dans `PowerTrack.xcodepro
   - `SeanceDetailView.swift` — Écran principal de séance en salle (`SeanceProgressHeaderView`, `ExerciceSectionHeaderView`, `BackoffAdaptationBannerView`, `SerieCompactRowView`, `CompactStepButton`, accès `SeanceExportSheet`, fin de séance).
   - `EtapeEchauffement.swift` — Calculateur et feuille modale d'échauffement (`genererPaliersEchauffement`, `EchauffementSheetView`).
   - `SeanceSummarySheet.swift` — Modale de bilan en fin de séance (tonnage, meilleur e1RM, séries validées, durée réelle via `SeanceProgressTracker`, Top Sets vs RPE cible, accès direct à l'export & ressentis).
-  - `TimerState.swift` — `TimerManager` (`ObservableObject`) : calcul des durées min/max selon catégorie & RPE, boucle `0.1s` sur timestamp absolu, notifications locales, pilotage de la Live Activity.
-  - `TimerView.swift` — Bandeau chrono flottant en bas de `SeanceDetailView` (blanc → vert au palier min → rouge au palier max, `+30s`, stop).
+  - `TimerState.swift` — `TimerManager.shared` (`ObservableObject`, `@MainActor`) : calcul des durées min/max selon catégorie & RPE, horodatages absolus (`dateFinMin` / `dateFinMax`), resynchronisation `willEnterForegroundNotification`, notifications locales unifiées et pilotage de la Live Activity.
+  - `TimerView.swift` — Bandeau chrono flottant en bas de `SeanceDetailView` affichant le compte à rebours `tempsRestantMax` (blanc → vert au palier min → rouge à `00:00`), statut `Min` / `Prêt` / `Terminé`, `+30s`, `Passer`.
   - `HapticAndSoundManager.swift` — Retours haptiques pré-chauffés (`selection`, `light`, `setValidated`, `PRValidated`) et session `AVAudioSession` `.ambient` avec `[.mixWithOthers, .duckOthers]` pour baisser temporairement Spotify/Apple Music sans la couper.
-  - `RestTimerAttributes.swift` — Définition `ActivityAttributes` pour la Live Activity côté app.
-  - `RestTimerActivityManager.swift` — Gestionnaire `@MainActor` (`LiveActivityManager` aliasé) pour démarrer, prolonger (`+30s`), clôturer automatiquement la Live Activity et planifier la notification de fin de repos.
-  - `RestTimerAppIntents.swift` — `AjouterTempsIntent` et `PasserReposIntent` côté app.
+  - `RestTimerAttributes.swift` — Définition `ActivityAttributes` partagée (cibles `PowerTrack` + `PowerTrackWidgetsExtension`), conforme `Sendable` avec propriété `timerRange`.
+  - `RestTimerActivityManager.swift` — Gestionnaire `@MainActor` (`LiveActivityManager` aliasé) pour démarrer, prolonger (`+30s`) et clôturer proprement la Live Activity sans activité orpheline.
+  - `RestTimerAppIntents.swift` — `AjouterTempsIntent` et `PasserReposIntent` (`LiveActivityIntent`) partagés entre les deux cibles et routés vers `TimerManager.shared`.
   - `PerformanceDashboardView.swift` — Onglet Performance avec sélecteur multi-blocs (`selectedBlocID`), Total SBD estimé + répartition proportionnelle, graphique `AreaMark`/`LineMark` d'évolution e1RM (calcul via `Serie.calculerE1RM()`), tonnage hebdomadaire empilé par catégorie (`Compétition`, `Variante`, `Accessoire`), et bandeau RPE moyen hebdomadaire.
   - `SeanceExportDTO.swift`, `SeanceExportSheet.swift` & `ExportSettingsView.swift` — Contrat JSON v2 (`SeanceExportDTO` avec cibles vs réel, durée réelle, `seanceId` idempotent, `RessentiSeanceDTO`), configuration webhook `n8n` + auth header, file d'attente hors-ligne, et copie/partage JSON local.
 
 - **Cible `PowerTrackWidgetsExtension`** (`com.ethanruders.PowerTrack.PowerTrackWidgets`, `IPHONEOS_DEPLOYMENT_TARGET = 27.0`, `NSSupportsLiveActivities = YES`) :
   - `PowerTrackWidgetsBundle.swift` — Bundle `@main` enregistrant `RestTimerLiveActivityWidget`.
-  - `PowerTrackWidgetsLiveActivity.swift` — UI Écran verrouillé (`RestTimerLiveActivityView`) & Dynamic Island (états expanded, compact, minimal) avec compte à rebours natif `Text(timerInterval:countsDown:)` et boutons interactifs `WidgetAjouterTempsIntent` (`+30s`) / `WidgetPasserReposIntent` (`Passer`).
+  - `PowerTrackWidgetsLiveActivity.swift` — UI Écran verrouillé (`RestTimerLiveActivityView`) & Dynamic Island (états expanded, compact, minimal) avec compte à rebours natif `Text(timerInterval: context.state.timerRange)` et boutons interactifs `AjouterTempsIntent` (`+30s`) / `PasserReposIntent` (`Passer`).
 
 ---
 
@@ -109,9 +109,8 @@ Ces points ont été observés directement dans le code actuel et constituent d'
 1. **Export n8n consolidé (suite) :**
    - L'export JSON v2 par séance (URL `n8n` + auth configurables, ressentis, file d'attente hors-ligne, `seance.semaine?.nom`) et l'import de blocs JSON sont en place dans `SeanceExportDTO.swift`, `SeanceExportSheet.swift`, `ExportSettingsView.swift`, `ProgramJSONImporter.swift` et `ProgramImportSheet.swift`.
    - Reste optionnellement l'export consolidé d'une semaine/bloc complet d'un seul coup si besoin côté `n8n`.
-2. **Désynchronisation Live Activity (`+30s` / `Passer`) ↔ `TimerManager` :**
-   - `RestTimerAttributes` et les `AppIntent` sont dupliqués entre `PowerTrack/` et `PowerTrackWidgets/`.
-   - Cliquer sur `+30s` ou `Passer` depuis l'écran verrouillé (`WidgetAjouterTempsIntent` / `WidgetPasserReposIntent`) met à jour ou ferme la Live Activity, mais ne met pas à jour les notifications locales `UNUserNotificationCenter` ni l'état `TimerManager` lorsque l'app repasse au premier plan (et inversement, à vérifier lors d'un `ajouterTemps` ou `stopTimer`).
+2. **Désynchronisation Live Activity (`+30s` / `Passer`) ↔ `TimerManager` (résolu) :**
+   - Résolu : `RestTimerAttributes.swift` et `RestTimerAppIntents.swift` (`LiveActivityIntent`) sont désormais partagés entre `PowerTrack` et `PowerTrackWidgetsExtension` via `PBXFileSystemSynchronizedBuildFileExceptionSet` (`WIDGET_EXTENSION`), et routés sur `TimerManager.shared` (notifications locales + ActivityKit + UI synchronisés).
 3. **Multi-blocs dans `PerformanceDashboardView.swift` (résolu) :**
    - Résolu : filtre multi-blocs (`selectedBlocID: PersistentIdentifier?`, tri `@Query` par `dateDebut` décroissant) et déduplication du calcul e1RM via `Serie.calculerE1RM()`.
 4. **Cohérence des Deployment Targets :**

@@ -51,6 +51,14 @@
 			);
 			target = FB136C89305BD73300B35EAA /* PowerTrackWidgetsExtension */;
 		};
+		FB136CA2305BD73500B35EAA /* Exceptions for "PowerTrack" folder in "PowerTrackWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				RestTimerAppIntents.swift,
+				RestTimerAttributes.swift,
+			);
+			target = FB136C89305BD73300B35EAA /* PowerTrackWidgetsExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -64,6 +72,9 @@
 		};
 		FBB5458F3002871C0078EE1C /* PowerTrack */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				FB136CA2305BD73500B35EAA /* Exceptions for "PowerTrack" folder in "PowerTrackWidgetsExtension" target */,
+			);
 			path = PowerTrack;
 			sourceTree = "<group>";
 		};
@@ -271,6 +282,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "WIDGET_EXTENSION $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -303,6 +315,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "WIDGET_EXTENSION $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;

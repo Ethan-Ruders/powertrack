@@ -8,43 +8,38 @@
 import AppIntents
 import ActivityKit
 
-// MARK: - AppIntent : Ajouter 30 secondes (+30s)
+// MARK: - LiveActivityIntent : Ajouter 30 secondes (+30s)
 
-struct AjouterTempsIntent: AppIntent {
-    static var title: LocalizedStringResource = "+30s de repos"
-    static var description = IntentDescription("Ajoute 30 secondes au compte à rebours de repos sur la Live Activity.")
+nonisolated public struct AjouterTempsIntent: LiveActivityIntent {
+    public static var title: LocalizedStringResource = "+30s de repos"
+    public static var description = IntentDescription("Ajoute 30 secondes au compte à rebours de repos sur la Live Activity.")
+    public static var openAppWhenRun: Bool = false
+    public static var isDiscoverable: Bool = false
     
-    init() {}
+    public init() {}
     
-    func perform() async throws -> some IntentResult {
-        for activity in Activity<RestTimerAttributes>.activities {
-            let currentState = activity.content.state
-            let nouvelleDateFin = currentState.dateFinRepos.addingTimeInterval(30)
-            let updatedState = RestTimerAttributes.ContentState(
-                nomExercice: currentState.nomExercice,
-                numeroSerie: currentState.numeroSerie,
-                dateDebutRepos: currentState.dateDebutRepos,
-                dateFinRepos: nouvelleDateFin,
-                dureeTotale: nouvelleDateFin.timeIntervalSince(currentState.dateDebutRepos)
-            )
-            await activity.update(.init(state: updatedState, staleDate: nouvelleDateFin))
-        }
+    public func perform() async throws -> some IntentResult {
+        #if !WIDGET_EXTENSION
+        await TimerManager.shared.ajouterTempsDepuisIntent(30)
+        #endif
         return .result()
     }
 }
 
-// MARK: - AppIntent : Passer le repos
+// MARK: - LiveActivityIntent : Passer le repos
 
-struct PasserReposIntent: AppIntent {
-    static var title: LocalizedStringResource = "Passer le repos"
-    static var description = IntentDescription("Termine immédiatement le repos et clôture la Live Activity.")
+nonisolated public struct PasserReposIntent: LiveActivityIntent {
+    public static var title: LocalizedStringResource = "Passer le repos"
+    public static var description = IntentDescription("Termine immédiatement le repos et clôture la Live Activity.")
+    public static var openAppWhenRun: Bool = false
+    public static var isDiscoverable: Bool = false
     
-    init() {}
+    public init() {}
     
-    func perform() async throws -> some IntentResult {
-        for activity in Activity<RestTimerAttributes>.activities {
-            await activity.end(nil, dismissalPolicy: .immediate)
-        }
+    public func perform() async throws -> some IntentResult {
+        #if !WIDGET_EXTENSION
+        await TimerManager.shared.stopTimerDepuisIntent()
+        #endif
         return .result()
     }
 }

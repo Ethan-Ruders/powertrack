@@ -10,77 +10,6 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 
-// MARK: - Modèle d'Attributs de l'Activité (partagé)
-
-public struct RestTimerAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
-        public var nomExercice: String
-        public var numeroSerie: Int
-        public var dateDebutRepos: Date
-        public var dateFinRepos: Date
-        public var dureeTotale: TimeInterval
-        
-        public init(
-            nomExercice: String,
-            numeroSerie: Int,
-            dateDebutRepos: Date,
-            dateFinRepos: Date,
-            dureeTotale: TimeInterval
-        ) {
-            self.nomExercice = nomExercice
-            self.numeroSerie = numeroSerie
-            self.dateDebutRepos = dateDebutRepos
-            self.dateFinRepos = dateFinRepos
-            self.dureeTotale = dureeTotale
-        }
-    }
-    
-    public var nomSeance: String
-    
-    public init(nomSeance: String = "Séance PowerTrack") {
-        self.nomSeance = nomSeance
-    }
-}
-
-// MARK: - AppIntents Interactifs Écran Verrouillé
-
-struct WidgetAjouterTempsIntent: AppIntent {
-    static var title: LocalizedStringResource = "+30s de repos"
-    static var description = IntentDescription("Ajoute 30 secondes au compte à rebours de repos sur la Live Activity.")
-    
-    init() {}
-    
-    func perform() async throws -> some IntentResult {
-        for activity in Activity<RestTimerAttributes>.activities {
-            let currentState = activity.content.state
-            let nouvelleDateFin = currentState.dateFinRepos.addingTimeInterval(30)
-            let updatedState = RestTimerAttributes.ContentState(
-                nomExercice: currentState.nomExercice,
-                numeroSerie: currentState.numeroSerie,
-                dateDebutRepos: currentState.dateDebutRepos,
-                dateFinRepos: nouvelleDateFin,
-                dureeTotale: nouvelleDateFin.timeIntervalSince(currentState.dateDebutRepos)
-            )
-            await activity.update(.init(state: updatedState, staleDate: nouvelleDateFin))
-        }
-        return .result()
-    }
-}
-
-struct WidgetPasserReposIntent: AppIntent {
-    static var title: LocalizedStringResource = "Passer le repos"
-    static var description = IntentDescription("Termine immédiatement le repos et clôture la Live Activity.")
-    
-    init() {}
-    
-    func perform() async throws -> some IntentResult {
-        for activity in Activity<RestTimerAttributes>.activities {
-            await activity.end(nil, dismissalPolicy: .immediate)
-        }
-        return .result()
-    }
-}
-
 // MARK: - Palette Locale Widget (Flighty / Swiss Editorial)
 
 private enum PTWidgetPalette {
@@ -117,17 +46,21 @@ public struct RestTimerLiveActivityWidget: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(timerInterval: Date()...context.state.dateFinRepos, pauseTime: nil, countsDown: true)
+                    Text(timerInterval: context.state.timerRange, pauseTime: nil, countsDown: true)
                         .font(.title2.weight(.bold).monospacedDigit())
                         .foregroundColor(PTWidgetPalette.chalkWhite)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 10) {
-                        ProgressView(timerInterval: Date()...context.state.dateFinRepos)
-                            .tint(PTWidgetPalette.copper)
+                        ProgressView(timerInterval: context.state.timerRange, countsDown: true) {
+                            EmptyView()
+                        } currentValueLabel: {
+                            EmptyView()
+                        }
+                        .tint(PTWidgetPalette.copper)
                         
                         HStack {
-                            Button(intent: WidgetAjouterTempsIntent()) {
+                            Button(intent: AjouterTempsIntent()) {
                                 Label("+30s", systemImage: "goforward.30")
                                     .font(.caption2.weight(.bold))
                             }
@@ -135,7 +68,7 @@ public struct RestTimerLiveActivityWidget: Widget {
                             
                             Spacer()
                             
-                            Button(intent: WidgetPasserReposIntent()) {
+                            Button(intent: PasserReposIntent()) {
                                 Text("Passer")
                                     .font(.caption2.weight(.bold))
                                     .foregroundColor(PTWidgetPalette.bg)
@@ -148,7 +81,7 @@ public struct RestTimerLiveActivityWidget: Widget {
                 Image(systemName: "timer")
                     .foregroundColor(PTWidgetPalette.copper)
             } compactTrailing: {
-                Text(timerInterval: Date()...context.state.dateFinRepos, pauseTime: nil, countsDown: true)
+                Text(timerInterval: context.state.timerRange, pauseTime: nil, countsDown: true)
                     .monospacedDigit()
                     .foregroundColor(PTWidgetPalette.chalkWhite)
                     .frame(width: 45)
@@ -194,17 +127,21 @@ public struct RestTimerLiveActivityView: View {
                 Spacer()
                 
                 // Compte à rebours dynamique natif Apple (décompte fluide continu)
-                Text(timerInterval: Date()...state.dateFinRepos, pauseTime: nil, countsDown: true)
+                Text(timerInterval: state.timerRange, pauseTime: nil, countsDown: true)
                     .font(.system(size: 32, weight: .bold).monospacedDigit())
                     .foregroundColor(PTWidgetPalette.chalkWhite)
             }
             
             // 2. Barre de progression cuivre ultra-fine
-            ProgressView(timerInterval: Date()...state.dateFinRepos)
-                .progressViewStyle(LinearProgressViewStyle(tint: PTWidgetPalette.copper))
-                .clipShape(Capsule())
+            ProgressView(timerInterval: state.timerRange, countsDown: true) {
+                EmptyView()
+            } currentValueLabel: {
+                EmptyView()
+            }
+            .progressViewStyle(LinearProgressViewStyle(tint: PTWidgetPalette.copper))
+            .clipShape(Capsule())
             
-            // 3. Pied avec actions AppIntents style Flighty
+            // 3. Pied avec actions LiveActivityIntent style Flighty
             HStack(spacing: 10) {
                 Text("FIN · \(state.dateFinRepos.formatted(date: .omitted, time: .shortened))")
                     .font(.system(size: 10, weight: .semibold).monospacedDigit())
@@ -213,29 +150,31 @@ public struct RestTimerLiveActivityView: View {
                 
                 Spacer()
                 
-                Button(intent: WidgetAjouterTempsIntent()) {
+                Button(intent: AjouterTempsIntent()) {
                     Label("+30s", systemImage: "goforward.30")
                         .font(.caption.weight(.bold))
                         .foregroundColor(PTWidgetPalette.copper)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
                         .background(PTWidgetPalette.surfacePill)
                         .overlay(
                             Capsule()
                                 .stroke(PTWidgetPalette.hairline, lineWidth: 0.5)
                         )
                         .clipShape(Capsule())
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                Button(intent: WidgetPasserReposIntent()) {
+                Button(intent: PasserReposIntent()) {
                     Text("Passer")
                         .font(.caption.weight(.bold))
                         .foregroundColor(PTWidgetPalette.bg)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 8)
                         .padding(.horizontal, 14)
                         .background(PTWidgetPalette.chalkWhite)
                         .clipShape(Capsule())
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(PlainButtonStyle())
             }

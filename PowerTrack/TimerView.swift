@@ -10,62 +10,95 @@ import SwiftUI
 struct TimerView: View {
     @ObservedObject var timerManager: TimerManager
     
+    private var peutRetirerTemps: Bool {
+        timerManager.tempsRestantMax > 0
+    }
+    
     var body: some View {
         if timerManager.state != .inactive {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(couleurChrono)
-                    .frame(width: 8, height: 8)
-                
-                Text(formatTime(timerManager.tempsRestantMax))
-                    .font(.system(size: 19, weight: .bold).monospacedDigit())
-                    .foregroundColor(couleurChrono)
-                    .lineLimit(1)
-                
-                Text(labelStatut)
-                    .font(.caption.weight(.medium).monospacedDigit())
-                    .foregroundColor(couleurStatut)
-                    .lineLimit(1)
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(couleurChrono)
+                        .frame(width: 8, height: 8)
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(formatTime(timerManager.tempsRestantMax))
+                            .font(.system(size: 18, weight: .bold).monospacedDigit())
+                            .foregroundColor(couleurChrono)
+                            .lineLimit(1)
+                        
+                        Text(labelStatut)
+                            .font(.caption2.weight(.medium).monospacedDigit())
+                            .foregroundColor(couleurStatut)
+                            .lineLimit(1)
+                    }
+                }
                 
                 Spacer(minLength: 6)
                 
-                Button(action: {
-                    HapticAndSoundManager.shared.triggerLightImpact()
-                    timerManager.ajouterTemps(30)
-                }) {
-                    Text("+30s")
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundColor(PTTheme.textPrimary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(PTTheme.surface)
-                        .overlay(
-                            Capsule()
-                                .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
-                        )
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                
-                Button(action: {
-                    HapticAndSoundManager.shared.triggerLightImpact()
-                    withAnimation(.snappy(duration: 0.25)) {
-                        timerManager.stopTimer()
+                HStack(spacing: 6) {
+                    Button(action: {
+                        HapticAndSoundManager.shared.triggerLightImpact()
+                        timerManager.retirerTemps(30)
+                    }) {
+                        Text("-30s")
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundColor(PTTheme.textPrimary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(PTTheme.surface)
+                            .overlay(
+                                Capsule()
+                                    .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+                            )
+                            .clipShape(Capsule())
                     }
-                }) {
-                    Text("Passer")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(PTTheme.bg)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 7)
-                        .background(PTTheme.textPrimary)
-                        .clipShape(Capsule())
+                    .buttonStyle(.plain)
+                    .disabled(!peutRetirerTemps)
+                    .opacity(peutRetirerTemps ? 1.0 : 0.4)
+                    .accessibilityLabel("Retirer 30 secondes")
+                    
+                    Button(action: {
+                        HapticAndSoundManager.shared.triggerLightImpact()
+                        timerManager.ajouterTemps(30)
+                    }) {
+                        Text("+30s")
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundColor(PTTheme.textPrimary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(PTTheme.surface)
+                            .overlay(
+                                Capsule()
+                                    .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Ajouter 30 secondes")
+                    
+                    Button(action: {
+                        HapticAndSoundManager.shared.triggerLightImpact()
+                        withAnimation(.snappy(duration: 0.25)) {
+                            timerManager.stopTimer()
+                        }
+                    }) {
+                        Text("Passer")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(PTTheme.bg)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(PTTheme.textPrimary)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Passer le repos")
                 }
-                .buttonStyle(.plain)
             }
-            .padding(.leading, 16)
+            .padding(.leading, 14)
             .padding(.trailing, 10)
-            .padding(.vertical, 9)
+            .padding(.vertical, 8)
             .background(PTTheme.surfaceElevated)
             .overlay(
                 Capsule()

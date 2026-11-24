@@ -79,10 +79,15 @@ public final class RestTimerActivityManager {
         }
     }
     
-    // MARK: - Mise à Jour Dynamique (+30s)
+    // MARK: - Mise à Jour Dynamique (±30s)
     
     /// Met à jour toutes les Live Activities actives avec une date de fin explicite.
     public func mettreAJourDateFinAsync(_ nouvelleDateFin: Date) async {
+        if nouvelleDateFin <= Date() {
+            await endLiveActivityAsync()
+            return
+        }
+        
         let activities = collectTrackedActivities()
         guard !activities.isEmpty else { return }
         
@@ -114,10 +119,17 @@ public final class RestTimerActivityManager {
         
         let now = Date()
         var lastUpdatedState: RestTimerAttributes.ContentState?
+        var anyExpired = false
         
         for activity in activities {
             let currentState = activity.content.state
             let nouvelleDateFin = max(now, currentState.dateFinRepos).addingTimeInterval(secondes)
+            if nouvelleDateFin <= now {
+                await activity.end(nil, dismissalPolicy: .immediate)
+                anyExpired = true
+                continue
+            }
+            
             let dureeTotale = max(0, nouvelleDateFin.timeIntervalSince(currentState.dateDebutRepos))
             
             let updatedState = RestTimerAttributes.ContentState(
@@ -135,7 +147,13 @@ public final class RestTimerActivityManager {
         
         if let lastUpdatedState {
             programmerClotureAutomatique(a: lastUpdatedState.dateFinRepos)
-            print("⏱️ Live Activity mise à jour : +\(Int(secondes))s (Nouvelle fin : \(lastUpdatedState.dateFinRepos))")
+            let deltaStr = secondes >= 0 ? "+\(Int(secondes))s" : "\(Int(secondes))s"
+            print("⏱️ Live Activity mise à jour : \(deltaStr) (Nouvelle fin : \(lastUpdatedState.dateFinRepos))")
+        } else if anyExpired {
+            timerClotureAuto?.invalidate()
+            timerClotureAuto = nil
+            currentActivity = nil
+            print("🛑 Live Activity expirée après ajustement.")
         }
         
         return lastUpdatedState

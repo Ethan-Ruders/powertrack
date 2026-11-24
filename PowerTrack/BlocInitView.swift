@@ -20,8 +20,8 @@ struct BlocInitView: View {
     @State private var nomBloc: String = "Bloc Force Personnalisé"
     @State private var mouvementsSelectionnes: Set<MouvementCompetition> = [.squat, .bench, .deadlift]
     
-    // Variantes sélectionnées par mouvement
-    @State private var variantesParMouvement: [MouvementCompetition: Set<VarianteMouvement>] = [
+    // Variantes sélectionnées par mouvement (ordre de sélection conservé)
+    @State private var variantesParMouvement: [MouvementCompetition: [VarianteMouvement]] = [
         .squat: [.pauseSquat],
         .bench: [.benchTempo],
         .deadlift: [.pauseDeadlift]
@@ -244,9 +244,16 @@ struct BlocInitView: View {
                                                     )
                                                 
                                                 if isSelected {
-                                                    Image(systemName: "checkmark")
-                                                        .font(.system(size: 11, weight: .bold))
-                                                        .foregroundColor(PTTheme.bg)
+                                                    if let rang = rangVariante(variante, for: mouv),
+                                                       (variantesParMouvement[mouv]?.count ?? 0) > 1 {
+                                                        Text("\(rang)")
+                                                            .font(.system(size: 11, weight: .bold).monospacedDigit())
+                                                            .foregroundColor(PTTheme.bg)
+                                                    } else {
+                                                        Image(systemName: "checkmark")
+                                                            .font(.system(size: 11, weight: .bold))
+                                                            .foregroundColor(PTTheme.bg)
+                                                    }
                                                 }
                                             }
                                             
@@ -301,7 +308,7 @@ struct BlocInitView: View {
                 }
             }
             
-            Text("Sélectionnez les variantes souhaitées et ajustez le ratio appliqué au 1RM de référence.")
+            Text("Sélectionnez une ou plusieurs variantes (l'ordre de sélection définit leur priorité) et ajustez leur coefficient par rapport au 1RM. Toutes les variantes choisies sont réparties sur les séances du bloc.")
                 .font(.caption)
                 .foregroundColor(PTTheme.textTertiary)
                 .padding(.horizontal, 16)
@@ -501,7 +508,7 @@ struct BlocInitView: View {
         } else {
             mouvementsSelectionnes.insert(mouv)
             if variantesParMouvement[mouv] == nil || variantesParMouvement[mouv]!.isEmpty {
-                variantesParMouvement[mouv] = Set(mouv.variantesDisponibles.prefix(1))
+                variantesParMouvement[mouv] = Array(mouv.variantesDisponibles.prefix(1))
             }
         }
     }
@@ -510,14 +517,21 @@ struct BlocInitView: View {
         variantesParMouvement[mouv]?.contains(variante) ?? false
     }
     
+    private func rangVariante(_ variante: VarianteMouvement, for mouv: MouvementCompetition) -> Int? {
+        guard let list = variantesParMouvement[mouv], let idx = list.firstIndex(of: variante) else {
+            return nil
+        }
+        return idx + 1
+    }
+    
     private func toggleVariante(_ variante: VarianteMouvement, for mouv: MouvementCompetition) {
         var actuelles = variantesParMouvement[mouv] ?? []
-        if actuelles.contains(variante) {
+        if let idx = actuelles.firstIndex(of: variante) {
             if actuelles.count > 1 {
-                actuelles.remove(variante)
+                actuelles.remove(at: idx)
             }
         } else {
-            actuelles.insert(variante)
+            actuelles.append(variante)
         }
         variantesParMouvement[mouv] = actuelles
     }
@@ -546,11 +560,11 @@ struct BlocInitView: View {
         
         var variantesFinales: [MouvementCompetition: [VarianteMouvement]] = [:]
         for mouv in mouvementsSelectionnes {
-            let set = variantesParMouvement[mouv] ?? []
-            if set.isEmpty {
+            let liste = variantesParMouvement[mouv] ?? []
+            if liste.isEmpty {
                 variantesFinales[mouv] = Array(mouv.variantesDisponibles.prefix(1))
             } else {
-                variantesFinales[mouv] = Array(set)
+                variantesFinales[mouv] = liste
             }
         }
         

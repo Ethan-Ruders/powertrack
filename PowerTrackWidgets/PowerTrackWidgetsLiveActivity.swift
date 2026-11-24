@@ -59,7 +59,13 @@ public struct RestTimerLiveActivityWidget: Widget {
                         }
                         .tint(PTWidgetPalette.copper)
                         
-                        HStack {
+                        HStack(spacing: 8) {
+                            Button(intent: RetirerTempsIntent()) {
+                                Label("-30s", systemImage: "gobackward.30")
+                                    .font(.caption2.weight(.bold))
+                            }
+                            .tint(PTWidgetPalette.muted)
+                            
                             Button(intent: AjouterTempsIntent()) {
                                 Label("+30s", systemImage: "goforward.30")
                                     .font(.caption2.weight(.bold))
@@ -142,20 +148,39 @@ public struct RestTimerLiveActivityView: View {
             .clipShape(Capsule())
             
             // 3. Pied avec actions LiveActivityIntent style Flighty
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Text("FIN · \(state.dateFinRepos.formatted(date: .omitted, time: .shortened))")
                     .font(.system(size: 10, weight: .semibold).monospacedDigit())
                     .tracking(0.8)
                     .foregroundColor(PTWidgetPalette.muted)
+                    .lineLimit(1)
                 
                 Spacer()
+                
+                Button(intent: RetirerTempsIntent()) {
+                    Label("-30s", systemImage: "gobackward.30")
+                        .font(.caption.weight(.bold))
+                        .lineLimit(1)
+                        .foregroundColor(PTWidgetPalette.chalkWhite)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 11)
+                        .background(PTWidgetPalette.surfacePill)
+                        .overlay(
+                            Capsule()
+                                .stroke(PTWidgetPalette.hairline, lineWidth: 0.5)
+                        )
+                        .clipShape(Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(PlainButtonStyle())
                 
                 Button(intent: AjouterTempsIntent()) {
                     Label("+30s", systemImage: "goforward.30")
                         .font(.caption.weight(.bold))
+                        .lineLimit(1)
                         .foregroundColor(PTWidgetPalette.copper)
                         .padding(.vertical, 8)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 11)
                         .background(PTWidgetPalette.surfacePill)
                         .overlay(
                             Capsule()
@@ -169,9 +194,10 @@ public struct RestTimerLiveActivityView: View {
                 Button(intent: PasserReposIntent()) {
                     Text("Passer")
                         .font(.caption.weight(.bold))
+                        .lineLimit(1)
                         .foregroundColor(PTWidgetPalette.bg)
                         .padding(.vertical, 8)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 12)
                         .background(PTWidgetPalette.chalkWhite)
                         .clipShape(Capsule())
                         .contentShape(Capsule())

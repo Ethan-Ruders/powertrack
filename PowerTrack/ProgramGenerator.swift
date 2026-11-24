@@ -149,8 +149,21 @@ struct ProgramConfiguration {
         }
     }
     
+    func variantesOrdonnees(pour mouvement: MouvementCompetition) -> [VarianteMouvement] {
+        guard let list = variantesSelectionnees[mouvement], !list.isEmpty else {
+            return []
+        }
+        var seen = Set<VarianteMouvement>()
+        return list.filter { seen.insert($0).inserted }
+    }
+    
+    func nombreVariantesSelectionnees(pour mouvement: MouvementCompetition) -> Int {
+        max(1, variantesOrdonnees(pour: mouvement).count)
+    }
+    
     func variante(pour mouvement: MouvementCompetition, index: Int = 0) -> VarianteMouvement {
-        if let list = variantesSelectionnees[mouvement], !list.isEmpty {
+        let list = variantesOrdonnees(pour: mouvement)
+        if !list.isEmpty {
             return list[index % list.count]
         }
         return mouvement.variantesDisponibles[index % mouvement.variantesDisponibles.count]
@@ -254,6 +267,8 @@ enum ProgramGenerator {
         switch gabarit {
         // Cas 1 : Squat Only (4 séances/semaine : 3 Squat Force + Hypertrophie complète)
         case .squatOnly:
+            let nbSquat = config.nombreVariantesSelectionnees(pour: .squat)
+            
             let s1 = nouvelleSeance(offsetJours: weekOffset + 0, baseDate: baseDate, titre: "Squat Compétition & Bas", semaine: semaine)
             s1.exercices = [
                 creerExerciceComp(mouv: .squat, config: config, numSemaine: numSemaine, ordre: 0, seance: s1),
@@ -273,18 +288,26 @@ enum ProgramGenerator {
             seances.append(s2)
             
             let s3 = nouvelleSeance(offsetJours: weekOffset + 3, baseDate: baseDate, titre: "Variante Squat & Unilatéral", semaine: semaine)
-            let vSquat = config.variante(pour: .squat)
+            let vSquatS3 = config.variante(pour: .squat, index: nbSquat >= 2 ? (numSemaine - 1) * 2 : 0)
             s3.exercices = [
-                creerExerciceVariante(variante: vSquat, config: config, numSemaine: numSemaine, ordre: 0, seance: s3),
+                creerExerciceVariante(variante: vSquatS3, config: config, numSemaine: numSemaine, ordre: 0, seance: s3),
                 creerAccessoire(nom: "Fentes Bulgares Haltères", cat: .polyarticulaire, series: 3, reps: 8, rpe: 7.0, indications: "Par jambe, stabilité bassin", numSemaine: numSemaine, ordre: 1, seance: s3),
                 creerAccessoire(nom: "Leg Extension", cat: .isolation, series: 3, reps: 12, rpe: 7.5, indications: "Isolation quadriceps", numSemaine: numSemaine, ordre: 2, seance: s3),
                 creerAccessoire(nom: "Leg Curl", cat: .isolation, series: 3, reps: 12, rpe: 7.5, indications: "Contrôle excentrique", numSemaine: numSemaine, ordre: 3, seance: s3)
             ]
             seances.append(s3)
             
-            let s4 = nouvelleSeance(offsetJours: weekOffset + 5, baseDate: baseDate, titre: "Squat Technique & Haut du Corps", semaine: semaine)
+            let titreSquatS4 = nbSquat >= 2 ? "Variante Squat & Haut du Corps" : "Squat Technique & Haut du Corps"
+            let s4 = nouvelleSeance(offsetJours: weekOffset + 5, baseDate: baseDate, titre: titreSquatS4, semaine: semaine)
+            let exSquatS4: Exercice
+            if nbSquat >= 2 {
+                let vSquatS4 = config.variante(pour: .squat, index: (numSemaine - 1) * 2 + 1)
+                exSquatS4 = creerExerciceVariante(variante: vSquatS4, rpeOffset: -0.5, config: config, numSemaine: numSemaine, ordre: 0, seance: s4)
+            } else {
+                exSquatS4 = creerExerciceCompTechnique(mouv: .squat, rpeOffset: -0.5, indications: "Technique & depth sous parallèle, barre fluide", config: config, numSemaine: numSemaine, ordre: 0, seance: s4)
+            }
             s4.exercices = [
-                creerExerciceCompTechnique(mouv: .squat, rpeOffset: -0.5, indications: "Technique & depth sous parallèle, barre fluide", config: config, numSemaine: numSemaine, ordre: 0, seance: s4),
+                exSquatS4,
                 creerAccessoire(nom: "Rowing Machine Prise Neutre", cat: .polyarticulaire, series: 3, reps: 10, rpe: 7.5, indications: "Renfort haut du dos pour le rack low-bar", numSemaine: numSemaine, ordre: 1, seance: s4),
                 creerAccessoire(nom: "Face Pull", cat: .isolation, series: 3, reps: 15, rpe: 7.0, indications: "Mobilité/stabilité épaules", numSemaine: numSemaine, ordre: 2, seance: s4),
                 creerAccessoire(nom: "Curl Marteau", cat: .isolation, series: 3, reps: 12, rpe: 7.0, indications: "Prise neutre anti-tendinite avant-bras/poignet", numSemaine: numSemaine, ordre: 3, seance: s4)
@@ -312,7 +335,7 @@ enum ProgramGenerator {
             seances.append(s2)
             
             let s3 = nouvelleSeance(offsetJours: weekOffset + 3, baseDate: baseDate, titre: "Variante Deadlift & Unilatéral", semaine: semaine)
-            let vDL = config.variante(pour: .deadlift)
+            let vDL = config.variante(pour: .deadlift, index: numSemaine - 1)
             s3.exercices = [
                 creerExerciceVariante(variante: vDL, config: config, numSemaine: numSemaine, ordre: 0, seance: s3),
                 creerAccessoire(nom: "Fentes Bulgares Haltères", cat: .polyarticulaire, series: 3, reps: 8, rpe: 7.0, indications: "Par jambe, zéro compression axiale", numSemaine: numSemaine, ordre: 1, seance: s3),
@@ -330,8 +353,10 @@ enum ProgramGenerator {
             ]
             seances.append(s4)
             
-        // Cas 3 : Bench Only (4 séances/semaine, 100% Haut du Corps, 4 Benchs : 3 Comp + 1 Variante)
+        // Cas 3 : Bench Only (4 séances/semaine, 100% Haut du Corps, 4 Benchs avec répartition dynamique des variantes)
         case .benchOnly:
+            let nbBench = config.nombreVariantesSelectionnees(pour: .bench)
+            
             let s1 = nouvelleSeance(offsetJours: weekOffset + 0, baseDate: baseDate, titre: "Bench Compétition (Principal) & Dos", semaine: semaine)
             s1.exercices = [
                 creerExerciceComp(mouv: .bench, config: config, numSemaine: numSemaine, ordre: 0, seance: s1),
@@ -341,9 +366,17 @@ enum ProgramGenerator {
             ]
             seances.append(s1)
             
-            let s2 = nouvelleSeance(offsetJours: weekOffset + 1, baseDate: baseDate, titre: "Bench Technique (Léger) & Épaules", semaine: semaine)
+            let titreBenchS2 = nbBench >= 3 ? "Variante Bench (Léger) & Épaules" : "Bench Technique (Léger) & Épaules"
+            let s2 = nouvelleSeance(offsetJours: weekOffset + 1, baseDate: baseDate, titre: titreBenchS2, semaine: semaine)
+            let exBenchS2: Exercice
+            if nbBench >= 3 {
+                let vBenchS2 = config.variante(pour: .bench, index: (numSemaine - 1) * 3)
+                exBenchS2 = creerExerciceVariante(variante: vBenchS2, rpeOffset: -0.5, config: config, numSemaine: numSemaine, ordre: 0, seance: s2)
+            } else {
+                exBenchS2 = creerExerciceCompTechnique(mouv: .bench, rpeOffset: -0.5, indications: "Vitesse & symétrie sur banc : pause 1ct légère sans fatigue", config: config, numSemaine: numSemaine, ordre: 0, seance: s2)
+            }
             s2.exercices = [
-                creerExerciceCompTechnique(mouv: .bench, rpeOffset: -0.5, indications: "Vitesse & symétrie sur banc : pause 1ct légère sans fatigue", config: config, numSemaine: numSemaine, ordre: 0, seance: s2),
+                exBenchS2,
                 creerAccessoire(nom: "Tirage Vertical", cat: .polyarticulaire, series: 4, reps: 10, rpe: 7.5, indications: "Prise contrôlée, omoplates abaissées", numSemaine: numSemaine, ordre: 1, seance: s2),
                 creerAccessoire(nom: "Élévations Latérales", cat: .isolation, series: 4, reps: 15, rpe: 7.0, indications: "Contrôle strict sans tricher", numSemaine: numSemaine, ordre: 2, seance: s2),
                 creerAccessoire(nom: "Curl Marteau", cat: .isolation, series: 3, reps: 12, rpe: 7.0, indications: "Prise neutre anti-tendinite avant-bras", numSemaine: numSemaine, ordre: 3, seance: s2)
@@ -351,7 +384,8 @@ enum ProgramGenerator {
             seances.append(s2)
             
             let s3 = nouvelleSeance(offsetJours: weekOffset + 3, baseDate: baseDate, titre: "Variante Bench & Hypertrophie Poussée", semaine: semaine)
-            let vB = config.variante(pour: .bench)
+            let idxBenchS3 = nbBench >= 3 ? (numSemaine - 1) * 3 + 1 : 0
+            let vB = config.variante(pour: .bench, index: idxBenchS3)
             s3.exercices = [
                 creerExerciceVariante(variante: vB, config: config, numSemaine: numSemaine, ordre: 0, seance: s3),
                 creerAccessoire(nom: "Développé Incliné Haltères", cat: .polyarticulaire, series: 3, reps: 10, rpe: 7.5, indications: "Hypertrophie haut de pecs, zéro surextension épaule", numSemaine: numSemaine, ordre: 1, seance: s3),
@@ -360,9 +394,18 @@ enum ProgramGenerator {
             ]
             seances.append(s3)
             
-            let s4 = nouvelleSeance(offsetJours: weekOffset + 5, baseDate: baseDate, titre: "Bench Technique (Secondaire) & Bras", semaine: semaine)
+            let titreBenchS4 = nbBench >= 2 ? "Variante Bench & Bras" : "Bench Technique (Secondaire) & Bras"
+            let s4 = nouvelleSeance(offsetJours: weekOffset + 5, baseDate: baseDate, titre: titreBenchS4, semaine: semaine)
+            let exBenchS4: Exercice
+            if nbBench >= 2 {
+                let idxBenchS4 = nbBench >= 3 ? (numSemaine - 1) * 3 + 2 : 1
+                let vBenchS4 = config.variante(pour: .bench, index: idxBenchS4)
+                exBenchS4 = creerExerciceVariante(variante: vBenchS4, config: config, numSemaine: numSemaine, ordre: 0, seance: s4)
+            } else {
+                exBenchS4 = creerExerciceCompTechnique(mouv: .bench, rpeOffset: 0.0, indications: "Technique & symétrie : pause 1ct nette sur chaque rep", config: config, numSemaine: numSemaine, ordre: 0, seance: s4)
+            }
             s4.exercices = [
-                creerExerciceCompTechnique(mouv: .bench, rpeOffset: 0.0, indications: "Technique & symétrie : pause 1ct nette sur chaque rep", config: config, numSemaine: numSemaine, ordre: 0, seance: s4),
+                exBenchS4,
                 creerAccessoire(nom: "Tirage Horizontal Poulie", cat: .polyarticulaire, series: 3, reps: 10, rpe: 7.5, indications: "Contrôle scapulaire", numSemaine: numSemaine, ordre: 1, seance: s4),
                 creerAccessoire(nom: "Extensions Triceps Poulie", cat: .isolation, series: 3, reps: 12, rpe: 7.5, indications: "Verrouillage triceps", numSemaine: numSemaine, ordre: 2, seance: s4),
                 creerAccessoire(nom: "Curl Marteau", cat: .isolation, series: 3, reps: 12, rpe: 7.0, indications: "Équilibre bras & protection coude", numSemaine: numSemaine, ordre: 3, seance: s4)
@@ -371,8 +414,11 @@ enum ProgramGenerator {
             
         // Cas 4 : Squat + Bench (4 séances/semaine : Squat+Var Bench J1 -> Bench J2 -> Var Squat+Var Bench J3 -> Squat+Bench J4)
         case .squatBench:
+            let nbSquat = config.nombreVariantesSelectionnees(pour: .squat)
+            let nbBench = config.nombreVariantesSelectionnees(pour: .bench)
+            
             let s1 = nouvelleSeance(offsetJours: weekOffset + 0, baseDate: baseDate, titre: "Squat Compétition & Variante Bench", semaine: semaine)
-            let vB1 = config.variante(pour: .bench, index: 0)
+            let vB1 = config.variante(pour: .bench, index: nbBench >= 3 ? (numSemaine - 1) * 3 : 0)
             s1.exercices = [
                 creerExerciceComp(mouv: .squat, config: config, numSemaine: numSemaine, ordre: 0, seance: s1),
                 creerExerciceVariante(variante: vB1, config: config, numSemaine: numSemaine, ordre: 1, seance: s1),
@@ -391,8 +437,8 @@ enum ProgramGenerator {
             seances.append(s2)
             
             let s3 = nouvelleSeance(offsetJours: weekOffset + 3, baseDate: baseDate, titre: "Variante Squat & Variante Bench", semaine: semaine)
-            let vS = config.variante(pour: .squat)
-            let vB2 = config.variante(pour: .bench, index: 1)
+            let vS = config.variante(pour: .squat, index: nbSquat >= 2 ? (numSemaine - 1) * 2 : 0)
+            let vB2 = config.variante(pour: .bench, index: nbBench >= 3 ? (numSemaine - 1) * 3 + 1 : 1)
             s3.exercices = [
                 creerExerciceVariante(variante: vS, config: config, numSemaine: numSemaine, ordre: 0, seance: s3),
                 creerExerciceVariante(variante: vB2, config: config, numSemaine: numSemaine, ordre: 1, seance: s3),
@@ -401,10 +447,35 @@ enum ProgramGenerator {
             ]
             seances.append(s3)
             
-            let s4 = nouvelleSeance(offsetJours: weekOffset + 5, baseDate: baseDate, titre: "Squat & Bench Technique", semaine: semaine)
+            let titreS4: String
+            switch (nbSquat >= 2, nbBench >= 3) {
+            case (true, true):
+                titreS4 = "Variantes Squat & Bench"
+            case (true, false):
+                titreS4 = "Variante Squat & Bench Technique"
+            case (false, true):
+                titreS4 = "Squat Technique & Variante Bench"
+            case (false, false):
+                titreS4 = "Squat & Bench Technique"
+            }
+            let s4 = nouvelleSeance(offsetJours: weekOffset + 5, baseDate: baseDate, titre: titreS4, semaine: semaine)
+            let exSquatS4: Exercice
+            if nbSquat >= 2 {
+                let vSquatS4 = config.variante(pour: .squat, index: (numSemaine - 1) * 2 + 1)
+                exSquatS4 = creerExerciceVariante(variante: vSquatS4, rpeOffset: -0.5, config: config, numSemaine: numSemaine, ordre: 0, seance: s4)
+            } else {
+                exSquatS4 = creerExerciceCompTechnique(mouv: .squat, rpeOffset: -0.5, indications: "Technique & depth sous parallèle, barre fluide", config: config, numSemaine: numSemaine, ordre: 0, seance: s4)
+            }
+            let exBenchS4: Exercice
+            if nbBench >= 3 {
+                let vBenchS4 = config.variante(pour: .bench, index: (numSemaine - 1) * 3 + 2)
+                exBenchS4 = creerExerciceVariante(variante: vBenchS4, config: config, numSemaine: numSemaine, ordre: 1, seance: s4)
+            } else {
+                exBenchS4 = creerExerciceCompTechnique(mouv: .bench, rpeOffset: 0.0, indications: "Technique & symétrie : pause 1ct nette", config: config, numSemaine: numSemaine, ordre: 1, seance: s4)
+            }
             s4.exercices = [
-                creerExerciceCompTechnique(mouv: .squat, rpeOffset: -0.5, indications: "Technique & depth sous parallèle, barre fluide", config: config, numSemaine: numSemaine, ordre: 0, seance: s4),
-                creerExerciceCompTechnique(mouv: .bench, rpeOffset: 0.0, indications: "Technique & symétrie : pause 1ct nette", config: config, numSemaine: numSemaine, ordre: 1, seance: s4),
+                exSquatS4,
+                exBenchS4,
                 creerAccessoire(nom: "Leg Curl", cat: .isolation, series: 3, reps: 12, rpe: 7.5, indications: "Ischios sans charge lombaire", numSemaine: numSemaine, ordre: 2, seance: s4),
                 creerAccessoire(nom: "Curl Marteau", cat: .isolation, series: 3, reps: 12, rpe: 7.0, indications: "Prise neutre avant-bras/poignet", numSemaine: numSemaine, ordre: 3, seance: s4)
             ]
@@ -431,8 +502,8 @@ enum ProgramGenerator {
             seances.append(s2)
             
             let s3 = nouvelleSeance(offsetJours: weekOffset + 4, baseDate: baseDate, titre: "Variantes Squat & Deadlift", semaine: semaine)
-            let vS = config.variante(pour: .squat)
-            let vD = config.variante(pour: .deadlift)
+            let vS = config.variante(pour: .squat, index: numSemaine - 1)
+            let vD = config.variante(pour: .deadlift, index: numSemaine - 1)
             s3.exercices = [
                 creerExerciceVariante(variante: vS, config: config, numSemaine: numSemaine, ordre: 0, seance: s3),
                 creerExerciceVariante(variante: vD, config: config, numSemaine: numSemaine, ordre: 1, seance: s3),
@@ -442,17 +513,27 @@ enum ProgramGenerator {
             
         // Cas 6 : Bench + Deadlift (4 séances/semaine : Bench à chaque séance en alternant Comp/Variante, DL 1 jour sur 2)
         case .benchDeadlift:
-            let s1 = nouvelleSeance(offsetJours: weekOffset + 0, baseDate: baseDate, titre: "Deadlift Compétition & Bench Technique", semaine: semaine)
+            let nbBench = config.nombreVariantesSelectionnees(pour: .bench)
+            
+            let titreBenchDL1 = nbBench >= 3 ? "Deadlift Compétition & Variante Bench" : "Deadlift Compétition & Bench Technique"
+            let s1 = nouvelleSeance(offsetJours: weekOffset + 0, baseDate: baseDate, titre: titreBenchDL1, semaine: semaine)
+            let exBenchS1: Exercice
+            if nbBench >= 3 {
+                let vBenchS1 = config.variante(pour: .bench, index: (numSemaine - 1) * 3)
+                exBenchS1 = creerExerciceVariante(variante: vBenchS1, config: config, numSemaine: numSemaine, ordre: 1, seance: s1)
+            } else {
+                exBenchS1 = creerExerciceCompTechnique(mouv: .bench, rpeOffset: 0.0, indications: "Technique & symétrie : pause 1ct nette", config: config, numSemaine: numSemaine, ordre: 1, seance: s1)
+            }
             s1.exercices = [
                 creerExerciceComp(mouv: .deadlift, config: config, numSemaine: numSemaine, ordre: 0, seance: s1),
-                creerExerciceCompTechnique(mouv: .bench, rpeOffset: 0.0, indications: "Technique & symétrie : pause 1ct nette", config: config, numSemaine: numSemaine, ordre: 1, seance: s1),
+                exBenchS1,
                 creerAccessoire(nom: "Rowing Buste Appuyé", cat: .polyarticulaire, series: 3, reps: 10, rpe: 7.5, indications: "Zéro stress lombaire", numSemaine: numSemaine, ordre: 2, seance: s1),
                 creerAccessoire(nom: "Leg Curl", cat: .isolation, series: 3, reps: 12, rpe: 7.5, indications: "Chaîne postérieure isolée", numSemaine: numSemaine, ordre: 3, seance: s1)
             ]
             seances.append(s1)
             
             let s2 = nouvelleSeance(offsetJours: weekOffset + 1, baseDate: baseDate, titre: "Variante Bench & Hypertrophie Haut", semaine: semaine)
-            let vB1 = config.variante(pour: .bench, index: 0)
+            let vB1 = config.variante(pour: .bench, index: nbBench >= 3 ? (numSemaine - 1) * 3 + 1 : 0)
             s2.exercices = [
                 creerExerciceVariante(variante: vB1, config: config, numSemaine: numSemaine, ordre: 0, seance: s2),
                 creerAccessoire(nom: "Développé Incliné Haltères", cat: .polyarticulaire, series: 3, reps: 10, rpe: 7.5, indications: "Hypertrophie haut de pecs, zéro surextension", numSemaine: numSemaine, ordre: 1, seance: s2),
@@ -462,7 +543,7 @@ enum ProgramGenerator {
             seances.append(s2)
             
             let s3 = nouvelleSeance(offsetJours: weekOffset + 3, baseDate: baseDate, titre: "Bench Compétition & Variante Deadlift", semaine: semaine)
-            let vD = config.variante(pour: .deadlift)
+            let vD = config.variante(pour: .deadlift, index: numSemaine - 1)
             s3.exercices = [
                 creerExerciceComp(mouv: .bench, config: config, numSemaine: numSemaine, ordre: 0, seance: s3),
                 creerExerciceVariante(variante: vD, config: config, numSemaine: numSemaine, ordre: 1, seance: s3),
@@ -472,7 +553,7 @@ enum ProgramGenerator {
             seances.append(s3)
             
             let s4 = nouvelleSeance(offsetJours: weekOffset + 5, baseDate: baseDate, titre: "Variante Bench & Hypertrophie", semaine: semaine)
-            let vB2 = config.variante(pour: .bench, index: 1)
+            let vB2 = config.variante(pour: .bench, index: nbBench >= 3 ? (numSemaine - 1) * 3 + 2 : 1)
             s4.exercices = [
                 creerExerciceVariante(variante: vB2, config: config, numSemaine: numSemaine, ordre: 0, seance: s4),
                 creerAccessoire(nom: "Presse à Cuisses", cat: .polyarticulaire, series: 3, reps: 10, rpe: 7.0, indications: "Hypertrophie quads sans fatigue lombaire", numSemaine: numSemaine, ordre: 1, seance: s4),
@@ -483,6 +564,8 @@ enum ProgramGenerator {
             
         // Cas 7 : Full SBD (4 séances/semaine : J1 DL / J2 Bench / J3 Squat + Var Bench / J4 SBD)
         case .fullSBD:
+            let nbBench = config.nombreVariantesSelectionnees(pour: .bench)
+            
             // J1 (Lundi) : Deadlift Compétition & Chaîne Postérieure / Dos
             let s1 = nouvelleSeance(offsetJours: weekOffset + 0, baseDate: baseDate, titre: "Deadlift Compétition & Dos/Jambes", semaine: semaine)
             s1.exercices = [
@@ -505,7 +588,7 @@ enum ProgramGenerator {
             
             // J3 (Jeudi - 72h après DL) : Squat Compétition & Variante Bench
             let s3 = nouvelleSeance(offsetJours: weekOffset + 3, baseDate: baseDate, titre: "Squat Compétition & Variante Bench", semaine: semaine)
-            let vB = config.variante(pour: .bench)
+            let vB = config.variante(pour: .bench, index: nbBench >= 2 ? (numSemaine - 1) * 2 : 0)
             s3.exercices = [
                 creerExerciceComp(mouv: .squat, config: config, numSemaine: numSemaine, ordre: 0, seance: s3),
                 creerExerciceVariante(variante: vB, config: config, numSemaine: numSemaine, ordre: 1, seance: s3),
@@ -514,13 +597,20 @@ enum ProgramGenerator {
             ]
             seances.append(s3)
             
-            // J4 (Samedi - suivi du dimanche off) : SBD (Variante Squat + Bench Comp Technique + Variante DL)
+            // J4 (Samedi - suivi du dimanche off) : SBD (Variante Squat + Bench Technique/Variante + Variante DL)
             let s4 = nouvelleSeance(offsetJours: weekOffset + 5, baseDate: baseDate, titre: "SBD Technique & Prévention", semaine: semaine)
-            let vS = config.variante(pour: .squat)
-            let vD = config.variante(pour: .deadlift)
+            let vS = config.variante(pour: .squat, index: numSemaine - 1)
+            let vD = config.variante(pour: .deadlift, index: numSemaine - 1)
+            let exBenchS4: Exercice
+            if nbBench >= 2 {
+                let vBenchS4 = config.variante(pour: .bench, index: (numSemaine - 1) * 2 + 1)
+                exBenchS4 = creerExerciceVariante(variante: vBenchS4, config: config, numSemaine: numSemaine, ordre: 1, seance: s4)
+            } else {
+                exBenchS4 = creerExerciceCompTechnique(mouv: .bench, rpeOffset: 0.0, indications: "Technique & symétrie : pause 1ct nette sur chaque rep, zéro rebond", config: config, numSemaine: numSemaine, ordre: 1, seance: s4)
+            }
             s4.exercices = [
                 creerExerciceVariante(variante: vS, config: config, numSemaine: numSemaine, ordre: 0, seance: s4),
-                creerExerciceCompTechnique(mouv: .bench, rpeOffset: 0.0, indications: "Technique & symétrie : pause 1ct nette sur chaque rep, zéro rebond", config: config, numSemaine: numSemaine, ordre: 1, seance: s4),
+                exBenchS4,
                 creerExerciceVariante(variante: vD, config: config, numSemaine: numSemaine, ordre: 2, seance: s4),
                 creerAccessoire(nom: "Curl Marteau", cat: .isolation, series: 3, reps: 12, rpe: 7.0, indications: "Prise neutre anti-tendinite avant-bras/poignet", numSemaine: numSemaine, ordre: 3, seance: s4)
             ]
@@ -724,6 +814,7 @@ enum ProgramGenerator {
     
     private static func creerExerciceVariante(
         variante: VarianteMouvement,
+        rpeOffset: Double = 0.0,
         config: ProgramConfiguration,
         numSemaine: Int,
         ordre: Int,
@@ -761,9 +852,10 @@ enum ProgramGenerator {
                 : ProgressionVariante(sets: 2, reps: 3, rpe: 6.0)
         }
         
-        let charge = rmParent > 0 ? arrondirCharge(calculerCharge(rm: rmParent, reps: plan.reps, rpe: plan.rpe, ratioVariante: ratio)) : nil
+        let rpeEffectif = max(5.5, min(8.5, plan.rpe + rpeOffset))
+        let charge = rmParent > 0 ? arrondirCharge(calculerCharge(rm: rmParent, reps: plan.reps, rpe: rpeEffectif, ratioVariante: ratio)) : nil
         for serieIdx in 0..<plan.sets {
-            let serie = Serie(repsCibles: plan.reps, rpeCible: plan.rpe, chargeSaisie: charge, ordre: serieIdx)
+            let serie = Serie(repsCibles: plan.reps, rpeCible: rpeEffectif, chargeSaisie: charge, ordre: serieIdx)
             serie.exercice = ex
             ex.series.append(serie)
         }

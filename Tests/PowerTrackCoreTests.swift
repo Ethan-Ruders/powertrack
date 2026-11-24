@@ -40,6 +40,7 @@ struct PowerTrackCoreTestRunner {
         testDOTSAndIPFGLScoring()
         testWarmupRungsGeneration()
         try testAllProgramGeneratorTemplates()
+        try testMultiVariantProgramGeneration()
         try testProgramJSONImporter()
         try testExportManagerDTOAndRessenti()
         try testBackupExportAndRestoreRoundTrip()
@@ -202,6 +203,232 @@ struct PowerTrackCoreTestRunner {
                         check(ordres == Array(0..<ex.series.count), "Séries doivent avoir un ordre contigu 0..<\(ex.series.count)")
                     }
                 }
+            }
+        }
+    }
+    
+    static func testMultiVariantProgramGeneration() throws {
+        let configContainer = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: MacroBloc.self, configurations: configContainer)
+        let context = ModelContext(container)
+        
+        func generer(
+            mouvements: Set<MouvementCompetition>,
+            variantes: [MouvementCompetition: [VarianteMouvement]]
+        ) throws -> [Semaine] {
+            let cfg = ProgramConfiguration(
+                nomBloc: "Test Multi Variantes",
+                mouvements: mouvements,
+                variantesSelectionnees: variantes,
+                ratiosVariantes: [:],
+                squat1RM: 170,
+                bench1RM: 130,
+                deadlift1RM: 200,
+                inclureSemaineTestPR: false,
+                dateDebut: Date(timeIntervalSince1970: 1_795_000_000)
+            )
+            let bloc = try ProgramGenerator.genererEtSauvegarder(config: cfg, into: context)
+            return bloc.semaines.sorted { $0.numero < $1.numero }
+        }
+        
+        func seancesTriees(_ semaine: Semaine) -> [Seance] {
+            semaine.seances.sorted { $0.date < $1.date }
+        }
+        
+        func exercicesTries(_ seance: Seance) -> [Exercice] {
+            seance.exercices.sorted { $0.ordre < $1.ordre }
+        }
+        
+        func occurrences(dans semaines: [Semaine], pour parent: MouvementParent) -> [String: Int] {
+            var counts: [String: Int] = [:]
+            for sem in semaines {
+                for sea in sem.seances {
+                    for ex in sea.exercices where ex.mouvementParent == parent && !ex.estMouvementCompetitionPur {
+                        counts[ex.nom, default: 0] += 1
+                    }
+                }
+            }
+            return counts
+        }
+        
+        // Garde de déduplication
+        let dupCfg = ProgramConfiguration(
+            nomBloc: "Dedup",
+            mouvements: [.bench],
+            variantesSelectionnees: [.bench: [.spotoPress, .spotoPress]],
+            ratiosVariantes: [:],
+            squat1RM: 0,
+            bench1RM: 130,
+            deadlift1RM: 0
+        )
+        check(dupCfg.nombreVariantesSelectionnees(pour: .bench) == 1, "Déduplication variante répétée -> count == 1")
+        check(dupCfg.variantesOrdonnees(pour: .bench) == [.spotoPress], "Déduplication garde Spoto Press unique")
+        
+        // 1. Bench Only - 1 variante (comportement inchangé)
+        do {
+            let sems = try generer(mouvements: [.bench], variantes: [.bench: [.spotoPress]])
+            check(sems.count == 4, "Bench Only 1 var : 4 semaines")
+            for sem in sems {
+                let s = seancesTriees(sem)
+                check(exercicesTries(s[0])[0].nom == "Bench Compétition", "Bench Only 1 var S1 Comp")
+                check(exercicesTries(s[1])[0].nom == "Bench Compétition", "Bench Only 1 var S2 Comp Tech")
+                check(exercicesTries(s[2])[0].nom == "Spoto Press", "Bench Only 1 var S3 Spoto")
+                check(exercicesTries(s[3])[0].nom == "Bench Compétition", "Bench Only 1 var S4 Comp Tech")
+                check(s[3].titre == "Bench Technique (Secondaire) & Bras", "Bench Only 1 var titre S4 conservé")
+            }
+        }
+        
+        // 2. Bench Only - 2 variantes
+        do {
+            let sems = try generer(mouvements: [.bench], variantes: [.bench: [.spotoPress, .larsenPress]])
+            for sem in sems {
+                let s = seancesTriees(sem)
+                check(exercicesTries(s[0])[0].nom == "Bench Compétition", "Bench Only 2 var S1 Comp")
+                check(exercicesTries(s[1])[0].nom == "Bench Compétition", "Bench Only 2 var S2 Comp Tech")
+                check(exercicesTries(s[2])[0].nom == "Spoto Press", "Bench Only 2 var S3 = 1re variante")
+                check(exercicesTries(s[3])[0].nom == "Larsen Press", "Bench Only 2 var S4 = 2e variante")
+                check(s[3].titre == "Variante Bench & Bras", "Bench Only 2 var titre S4 mis à jour")
+            }
+        }
+        
+        // 3. Bench Only - 3 variantes (ordre non-standard + vérification RPE léger S2)
+        do {
+            let sems = try generer(mouvements: [.bench], variantes: [.bench: [.larsenPress, .pause3CT, .spotoPress]])
+            for sem in sems {
+                let s = seancesTriees(sem)
+                check(exercicesTries(s[0])[0].nom == "Bench Compétition", "Bench Only 3 var S1 Comp")
+                check(exercicesTries(s[1])[0].nom == "Larsen Press", "Bench Only 3 var S2 = Larsen Press")
+                check(s[1].titre == "Variante Bench (Léger) & Épaules", "Bench Only 3 var S2 titre mis à jour")
+                check(exercicesTries(s[2])[0].nom == "Pause 3CT", "Bench Only 3 var S3 = Pause 3CT")
+                check(exercicesTries(s[3])[0].nom == "Spoto Press", "Bench Only 3 var S4 = Spoto Press")
+                check(s[3].titre == "Variante Bench & Bras", "Bench Only 3 var S4 titre mis à jour")
+            }
+            let s1Sem1 = seancesTriees(sems[0])
+            checkApprox(exercicesTries(s1Sem1[1])[0].seriesTriees.first?.rpeCible, 6.0, "Bench Only 3 var W1 S2 RPE léger == 6.0")
+            checkApprox(exercicesTries(s1Sem1[2])[0].seriesTriees.first?.rpeCible, 6.5, "Bench Only 3 var W1 S3 RPE standard == 6.5")
+        }
+        
+        // 4. Bench Only - 4 variantes (rotation continue sur 12 slots -> 3x chacune, jamais de doublon hebdo)
+        do {
+            let ordered: [VarianteMouvement] = [.benchTempo, .spotoPress, .pause3CT, .larsenPress]
+            let sems = try generer(mouvements: [.bench], variantes: [.bench: ordered])
+            let attenduesParSemaine: [[String]] = [
+                ["Bench Tempo", "Spoto Press", "Pause 3CT"],
+                ["Larsen Press", "Bench Tempo", "Spoto Press"],
+                ["Pause 3CT", "Larsen Press", "Bench Tempo"],
+                ["Spoto Press", "Pause 3CT", "Larsen Press"]
+            ]
+            for (idx, sem) in sems.enumerated() {
+                let s = seancesTriees(sem)
+                check(exercicesTries(s[0])[0].nom == "Bench Compétition", "Bench Only 4 var S1 reste Compétition")
+                let trio = [exercicesTries(s[1])[0].nom, exercicesTries(s[2])[0].nom, exercicesTries(s[3])[0].nom]
+                check(trio == attenduesParSemaine[idx], "Bench Only 4 var S\(idx + 1) rotation exacte")
+                check(Set(trio).count == 3, "Bench Only 4 var jamais 2x la même variante dans S\(idx + 1)")
+            }
+            let counts = occurrences(dans: sems, pour: .bench)
+            for v in ordered {
+                check(counts[v.rawValue] == 3, "Bench Only 4 var : \(v.rawValue) apparaît exactement 3 fois (obtenu \(counts[v.rawValue] ?? 0))")
+            }
+        }
+        
+        // 5. Squat Only - 2 et 3 variantes
+        do {
+            let sems2 = try generer(mouvements: [.squat], variantes: [.squat: [.tempoSquat, .boxSquat]])
+            for sem in sems2 {
+                let s = seancesTriees(sem)
+                check(exercicesTries(s[2])[0].nom == "Tempo Squat", "Squat Only 2 var S3 = Tempo Squat")
+                check(exercicesTries(s[3])[0].nom == "Box Squat", "Squat Only 2 var S4 = Box Squat")
+                check(s[3].titre == "Variante Squat & Haut du Corps", "Squat Only 2 var titre S4")
+            }
+            checkApprox(exercicesTries(seancesTriees(sems2[0])[3])[0].seriesTriees.first?.rpeCible, 6.0, "Squat Only 2 var W1 S4 RPE allégé == 6.0")
+            
+            let sq3: [VarianteMouvement] = [.pauseSquat, .tempoSquat, .boxSquat]
+            let sems3 = try generer(mouvements: [.squat], variantes: [.squat: sq3])
+            for sem in sems3 {
+                let s = seancesTriees(sem)
+                check(exercicesTries(s[2])[0].nom != exercicesTries(s[3])[0].nom, "Squat Only 3 var S3 != S4")
+            }
+            let counts = occurrences(dans: sems3, pour: .squat)
+            for v in sq3 {
+                check((counts[v.rawValue] ?? 0) >= 2, "Squat Only 3 var : \(v.rawValue) présent au moins 2x")
+            }
+        }
+        
+        // 6. Deadlift Only - 3 variantes (rotation hebdo S1..S4)
+        do {
+            let dl3: [VarianteMouvement] = [.pauseDeadlift, .blockPull, .deficitDeadlift]
+            let sems = try generer(mouvements: [.deadlift], variantes: [.deadlift: dl3])
+            let nomsS3 = sems.map { exercicesTries(seancesTriees($0)[2])[0].nom }
+            check(nomsS3 == ["Pause Deadlift", "Block Pull", "Deficit Deadlift", "Pause Deadlift"], "Deadlift Only 3 var rotation hebdo")
+        }
+        
+        // 7. Squat + Bench - 3 Squat + 4 Bench
+        do {
+            let sq3: [VarianteMouvement] = [.pauseSquat, .tempoSquat, .boxSquat]
+            let bn4: [VarianteMouvement] = [.benchTempo, .spotoPress, .pause3CT, .larsenPress]
+            let sems = try generer(mouvements: [.squat, .bench], variantes: [.squat: sq3, .bench: bn4])
+            check(seancesTriees(sems[0])[3].titre == "Variantes Squat & Bench", "Squat+Bench titre S4 quand les deux ont multi-variantes")
+            let sqCounts = occurrences(dans: sems, pour: .squat)
+            let bnCounts = occurrences(dans: sems, pour: .bench)
+            for v in sq3 {
+                check((sqCounts[v.rawValue] ?? 0) >= 2, "Squat+Bench : \(v.rawValue) présent")
+            }
+            for v in bn4 {
+                check(bnCounts[v.rawValue] == 3, "Squat+Bench : \(v.rawValue) 3x sur 4 semaines")
+            }
+        }
+        
+        // 8. Squat + Deadlift - 2 Squat + 3 Deadlift
+        do {
+            let sq2: [VarianteMouvement] = [.pauseSquat, .boxSquat]
+            let dl3: [VarianteMouvement] = [.pauseDeadlift, .blockPull, .deficitDeadlift]
+            let sems = try generer(mouvements: [.squat, .deadlift], variantes: [.squat: sq2, .deadlift: dl3])
+            let sqCounts = occurrences(dans: sems, pour: .squat)
+            let dlCounts = occurrences(dans: sems, pour: .deadlift)
+            for v in sq2 {
+                check(sqCounts[v.rawValue] == 2, "Squat+DL : \(v.rawValue) 2x")
+            }
+            for v in dl3 {
+                check((dlCounts[v.rawValue] ?? 0) >= 1, "Squat+DL : \(v.rawValue) présent")
+            }
+        }
+        
+        // 9. Bench + Deadlift - 4 Bench + 2 Deadlift
+        do {
+            let bn4: [VarianteMouvement] = [.benchTempo, .spotoPress, .pause3CT, .larsenPress]
+            let dl2: [VarianteMouvement] = [.pauseDeadlift, .deficitDeadlift]
+            let sems = try generer(mouvements: [.bench, .deadlift], variantes: [.bench: bn4, .deadlift: dl2])
+            check(seancesTriees(sems[0])[0].titre == "Deadlift Compétition & Variante Bench", "Bench+DL S1 titre mis à jour pour >=3 variantes")
+            let bnCounts = occurrences(dans: sems, pour: .bench)
+            let dlCounts = occurrences(dans: sems, pour: .deadlift)
+            for v in bn4 {
+                check(bnCounts[v.rawValue] == 3, "Bench+DL : \(v.rawValue) exactement 3x")
+            }
+            for v in dl2 {
+                check(dlCounts[v.rawValue] == 2, "Bench+DL : \(v.rawValue) exactement 2x")
+            }
+        }
+        
+        // 10. Full SBD - 2 Squat + 4 Bench + 3 Deadlift
+        do {
+            let sq2: [VarianteMouvement] = [.pauseSquat, .tempoSquat]
+            let bn4: [VarianteMouvement] = [.benchTempo, .spotoPress, .pause3CT, .larsenPress]
+            let dl3: [VarianteMouvement] = [.pauseDeadlift, .blockPull, .deficitDeadlift]
+            let sems = try generer(
+                mouvements: [.squat, .bench, .deadlift],
+                variantes: [.squat: sq2, .bench: bn4, .deadlift: dl3]
+            )
+            let sqCounts = occurrences(dans: sems, pour: .squat)
+            let bnCounts = occurrences(dans: sems, pour: .bench)
+            let dlCounts = occurrences(dans: sems, pour: .deadlift)
+            for v in sq2 {
+                check(sqCounts[v.rawValue] == 2, "Full SBD : \(v.rawValue) 2x")
+            }
+            for v in bn4 {
+                check(bnCounts[v.rawValue] == 2, "Full SBD : \(v.rawValue) 2x")
+            }
+            for v in dl3 {
+                check((dlCounts[v.rawValue] ?? 0) >= 1, "Full SBD : \(v.rawValue) présent")
             }
         }
     }

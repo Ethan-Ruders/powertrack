@@ -153,6 +153,11 @@ final class TimerManager: ObservableObject {
         }
     }
     
+    /// Retire du temps au chronomètre en cours (-30s par défaut)
+    func retirerTemps(_ secondes: TimeInterval = 30) {
+        ajouterTemps(-abs(secondes))
+    }
+    
     /// Ajoute du temps depuis une LiveActivityIntent et attend la mise à jour ActivityKit.
     func ajouterTempsDepuisIntent(_ secondes: TimeInterval = 30) async {
         if let nouvelleDateFin = appliquerAjoutTempsLocal(secondes) {
@@ -171,8 +176,15 @@ final class TimerManager: ObservableObject {
                 updateTemps()
                 demarrerBoucleTimer()
                 planifierNotifications(minDuration: tempsRestantMin, maxDuration: tempsRestantMax)
+            } else if secondes < 0 {
+                UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
             }
         }
+    }
+    
+    /// Retire du temps depuis une LiveActivityIntent et attend la mise à jour ActivityKit.
+    func retirerTempsDepuisIntent(_ secondes: TimeInterval = 30) async {
+        await ajouterTempsDepuisIntent(-abs(secondes))
     }
     
     /// Resynchronise le chronomètre avec l'horloge absolue et la Live Activity au retour au premier plan.
@@ -231,10 +243,16 @@ final class TimerManager: ObservableObject {
     
     private func appliquerAjoutTempsLocal(_ secondes: TimeInterval) -> Date? {
         if state == .paused {
-            minAlertDuration += secondes
-            maxAlertDuration += secondes
-            tempsRestantMin += secondes
-            tempsRestantMax += secondes
+            let nouvelleRestantMax = max(0, tempsRestantMax + secondes)
+            let nouvelleRestantMin = min(nouvelleRestantMax, max(0, tempsRestantMin + secondes))
+            tempsRestantMax = nouvelleRestantMax
+            tempsRestantMin = nouvelleRestantMin
+            maxAlertDuration = tempsEcouleAvantPause + nouvelleRestantMax
+            minAlertDuration = tempsEcouleAvantPause + nouvelleRestantMin
+            return nil
+        }
+        
+        if state == .finished && secondes <= 0 {
             return nil
         }
         
@@ -247,14 +265,19 @@ final class TimerManager: ObservableObject {
         dateDemarrage = baseStart
         
         let oldMax = dateFinMax ?? now
-        let nouvelleDateFinMax = max(now, oldMax).addingTimeInterval(secondes)
+        let rawNouvelleDateFinMax = max(now, oldMax).addingTimeInterval(secondes)
+        let nouvelleDateFinMax = max(now, rawNouvelleDateFinMax)
         let wasSameMinMax = abs(maxAlertDuration - minAlertDuration) < 0.5
         
         dateFinMax = nouvelleDateFinMax
         if wasSameMinMax {
             dateFinMin = nouvelleDateFinMax
-        } else if let oldMin = dateFinMin, oldMin > now {
-            dateFinMin = oldMin.addingTimeInterval(secondes)
+        } else if let oldMin = dateFinMin {
+            if oldMin > now {
+                dateFinMin = min(nouvelleDateFinMax, max(now, oldMin.addingTimeInterval(secondes)))
+            } else {
+                dateFinMin = min(oldMin, nouvelleDateFinMax)
+            }
         }
         
         let effectiveFinMin = dateFinMin ?? now
@@ -263,6 +286,16 @@ final class TimerManager: ObservableObject {
         tempsEcoule = max(0, now.timeIntervalSince(baseStart))
         tempsRestantMin = max(0, effectiveFinMin.timeIntervalSince(now))
         tempsRestantMax = max(0, nouvelleDateFinMax.timeIntervalSince(now))
+        
+        if tempsRestantMax <= 0 {
+            aJoueAlerteMin = true
+            aJoueAlerteMax = true
+            state = .finished
+            timer?.invalidate()
+            timer = nil
+            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+            return now
+        }
         
         aJoueAlerteMin = (tempsRestantMin <= 0)
         aJoueAlerteMax = false

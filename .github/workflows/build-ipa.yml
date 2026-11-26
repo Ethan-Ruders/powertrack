@@ -62,7 +62,7 @@ jobs:
           python3 .github/scripts/generate_source.py \
             --plist build/Build/Products/Release-iphoneos/PowerTrack.app/Info.plist \
             --ipa PowerTrack.ipa \
-            --icon "PowerTrack/Assets.xcassets/AppIcon.appiconset/2026-08-13_15-59-05_Lumina.png" \
+            --icon "PowerTrack/Assets.xcassets/AppIcon.appiconset/PowerTrackIcon.png" \
             --out-dir pages
 
       - name: Create GitHub Release

@@ -5,6 +5,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 private var testsPassed = 0
 
@@ -546,6 +547,17 @@ struct PowerTrackCoreTestRunner {
         checkApprox(dto.exercices[0].series[0].deltaRPE, 1.0, "Première série (ordre 0) exportée en premier avec deltaRPE = +1.0")
         check(dto.exercices[0].series[0].estValidee == true, "Série 1 exportée validée")
         check(dto.ressenti?.notesSeance == "Fluide", "Notes ressenti trimées")
+        
+        // Régression boucle infinie UI : sauvegarder deux fois le même poids de corps ne doit pas réémettre objectWillChange
+        let identicalRessenti = RessentiSeanceDTO(poidsCorpsKg: 74.2, sommeilHeures: 8.0)
+        ExportManager.shared.saveRessenti(identicalRessenti, for: seance)
+        var emittedCount = 0
+        let cancellable = ExportManager.shared.objectWillChange.sink { _ in
+            emittedCount += 1
+        }
+        ExportManager.shared.saveRessenti(identicalRessenti, for: seance)
+        cancellable.cancel()
+        check(emittedCount == 0, "saveRessenti identique n'émet pas objectWillChange (pas de boucle de rendu)")
     }
     
     // MARK: - 10. BackupManager Export & Restauration Complète

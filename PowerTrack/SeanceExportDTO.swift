@@ -205,6 +205,13 @@ final class ExportManager: ObservableObject {
     }
     
     private let defaults = UserDefaults.standard
+    private let httpSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 12
+        config.timeoutIntervalForResource = 15
+        config.waitsForConnectivity = false
+        return URLSession(configuration: config)
+    }()
     private var pathMonitor: NWPathMonitor?
     private var isAutoFlushing = false
     private var cancellables: Set<AnyCancellable> = []
@@ -276,6 +283,7 @@ final class ExportManager: ObservableObject {
     }
     
     func markSeanceExported(seanceId: String) {
+        guard !exportedSeanceIDs.contains(seanceId) else { return }
         exportedSeanceIDs.insert(seanceId)
         defaults.set(Array(exportedSeanceIDs), forKey: Keys.exportedSeanceIDs)
     }
@@ -309,7 +317,7 @@ final class ExportManager: ObservableObject {
         if let encoded = try? JSONEncoder().encode(ressenti) {
             defaults.set(encoded, forKey: key)
         }
-        if let bw = ressenti.poidsCorpsKg, bw > 0 {
+        if let bw = ressenti.poidsCorpsKg, bw > 0, lastBodyweightKg != bw {
             lastBodyweightKg = bw
         }
     }
@@ -506,6 +514,7 @@ final class ExportManager: ObservableObject {
     }
     
     func clearPendingQueue() {
+        guard !pendingQueue.isEmpty else { return }
         pendingQueue = []
         saveQueue()
     }
@@ -590,7 +599,7 @@ final class ExportManager: ObservableObject {
         
         request.httpBody = data
         
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await httpSession.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NSError(domain: "ExportManager", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "Réponse serveur non HTTP."
@@ -614,6 +623,7 @@ final class ExportManager: ObservableObject {
     }
     
     private func removeFromQueue(seanceId: String) {
+        guard pendingQueue.contains(where: { $0.seanceId == seanceId }) else { return }
         pendingQueue.removeAll { $0.seanceId == seanceId }
         saveQueue()
     }

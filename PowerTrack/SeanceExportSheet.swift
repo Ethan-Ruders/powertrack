@@ -23,6 +23,7 @@ struct SeanceExportSheet: View {
     @State private var feedbackMessage: String? = nil
     @State private var feedbackIsPositive = true
     @State private var copiedJSON = false
+    @State private var sharePayload: ShareJSONItem? = nil
     
     private let douleursRapides = [
         "Aucune",
@@ -63,7 +64,7 @@ struct SeanceExportSheet: View {
                 .padding(.vertical, 20)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(PTTheme.bg.ignoresSafeArea())
+            .ptAppBackground()
             .navigationTitle("Ressentis & Export")
             .navigationBarTitleDisplayMode(.inline)
             .ptAppearance()
@@ -84,9 +85,22 @@ struct SeanceExportSheet: View {
                             .foregroundColor(PTTheme.accent)
                     }
                 }
+                
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("OK") {
+                        hideKeyboard()
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(PTTheme.accent)
+                }
             }
             .sheet(isPresented: $isShowingSettings) {
                 ExportSettingsView()
+            }
+            .sheet(item: $sharePayload) { payload in
+                PTActivityShareSheet(activityItems: [payload.content])
+                    .ignoresSafeArea()
             }
             .onAppear(perform: chargerRessenti)
             .onDisappear(perform: sauvegarderRessenti)
@@ -268,10 +282,7 @@ struct SeanceExportSheet: View {
                 }
                 .buttonStyle(PTSecondaryPillButtonStyle())
                 
-                ShareLink(
-                    item: jsonCourant(),
-                    preview: SharePreview("PowerTrack - \(seance.titre ?? "Séance").json")
-                ) {
+                Button(action: preparerPartage) {
                     HStack(spacing: 6) {
                         Image(systemName: "square.and.arrow.up")
                         Text("Partager")
@@ -288,6 +299,7 @@ struct SeanceExportSheet: View {
                     )
                     .clipShape(Capsule())
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 16)
@@ -399,11 +411,19 @@ struct SeanceExportSheet: View {
     
     private func jsonCourant() -> String {
         let current = construireRessentiCourant()
-        exportManager.saveRessenti(current, for: seance)
         return exportManager.genererJSONString(for: seance, ressenti: current)
     }
     
+    private func preparerPartage() {
+        hideKeyboard()
+        sauvegarderRessenti()
+        HapticAndSoundManager.shared.triggerLightImpact()
+        sharePayload = ShareJSONItem(content: jsonCourant())
+    }
+    
     private func copierJSON() {
+        hideKeyboard()
+        sauvegarderRessenti()
         UIPasteboard.general.string = jsonCourant()
         HapticAndSoundManager.shared.triggerSetValidated()
         copiedJSON = true
@@ -412,14 +432,15 @@ struct SeanceExportSheet: View {
     }
     
     private func envoyerVersServeur() {
+        hideKeyboard()
         let current = construireRessentiCourant()
         exportManager.saveRessenti(current, for: seance)
         isExporting = true
         feedbackMessage = nil
         
         Task {
+            defer { isExporting = false }
             let outcome = await exportManager.exporterSeance(seance: seance, ressenti: current)
-            isExporting = false
             switch outcome {
             case .sent(let statusCode, _):
                 HapticAndSoundManager.shared.triggerPRValidated()
@@ -435,6 +456,25 @@ struct SeanceExportSheet: View {
             }
         }
     }
+    
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+
+private struct ShareJSONItem: Identifiable {
+    let id = UUID()
+    let content: String
+}
+
+private struct PTActivityShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 private extension Double {

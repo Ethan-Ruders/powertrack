@@ -273,7 +273,7 @@ struct SeanceSummarySheet: View {
                     .padding(.bottom, 28)
                 }
             }
-            .background(PTTheme.bg.ignoresSafeArea())
+            .ptAppBackground()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

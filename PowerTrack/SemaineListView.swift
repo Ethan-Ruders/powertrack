@@ -39,7 +39,7 @@ struct SemaineListView: View {
                 }
             }
         }
-        .background(PTTheme.bg.ignoresSafeArea())
+        .ptAppBackground()
         .navigationTitle(macroBloc.nom)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

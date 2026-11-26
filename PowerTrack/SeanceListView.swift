@@ -33,7 +33,7 @@ struct SeanceListView: View {
                 }
             }
         }
-        .background(PTTheme.bg.ignoresSafeArea())
+        .ptAppBackground()
         .navigationTitle(semaine.nom)
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {

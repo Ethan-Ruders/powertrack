@@ -15,6 +15,8 @@ struct ExportSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var exportManager = ExportManager.shared
     @AppStorage("pt_appearance_mode") private var appearanceModeRaw: String = PTAppearanceMode.system.rawValue
+    @AppStorage("pt_background_style") private var backgroundStyleRaw: String = PTBackgroundStyle.chrono.rawValue
+    @AppStorage("pt_background_opacity") private var backgroundOpacity: Double = 0.88
     
     @State private var isTesting = false
     @State private var isFlushing = false
@@ -44,7 +46,7 @@ struct ExportSettingsView: View {
                 .padding(.vertical, 20)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(PTTheme.bg.ignoresSafeArea())
+            .ptAppBackground()
             .navigationTitle("Réglages & Export")
             .navigationBarTitleDisplayMode(.inline)
             .ptAppearance()
@@ -108,15 +110,16 @@ struct ExportSettingsView: View {
     
     private var appearanceSection: some View {
         let selectedMode = PTAppearanceMode(rawValue: appearanceModeRaw) ?? .system
+        let selectedBackground = PTBackgroundStyle(rawValue: backgroundStyleRaw) ?? .chrono
         
         return VStack(alignment: .leading, spacing: 10) {
-            PTKicker(text: "Apparence")
+            PTKicker(text: "Apparence & Fond")
                 .padding(.horizontal, 16)
             
             VStack(spacing: 0) {
                 PTHairline()
                 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 14) {
                     Text("Suit automatiquement le mode jour / nuit de l'iPhone par défaut.")
                         .font(.caption)
                         .foregroundColor(PTTheme.textSecondary)
@@ -141,6 +144,49 @@ struct ExportSettingsView: View {
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
+                        }
+                    }
+                    
+                    PTHairline()
+                    
+                    PTKicker(text: "Fond d'écran")
+                    
+                    HStack(spacing: 6) {
+                        ForEach(PTBackgroundStyle.allCases) { bg in
+                            let isSelected = (bg == selectedBackground)
+                            Button {
+                                HapticAndSoundManager.shared.triggerSelection()
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    backgroundStyleRaw = bg.rawValue
+                                }
+                            } label: {
+                                Text(bg.label)
+                                    .font(.caption2.weight(isSelected ? .bold : .medium))
+                                    .foregroundColor(isSelected ? PTTheme.bg : PTTheme.textSecondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(isSelected ? PTTheme.textPrimary : PTTheme.surface)
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(isSelected ? Color.clear : PTTheme.hairline, lineWidth: 0.5)
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    
+                    if selectedBackground != .none {
+                        HStack(spacing: 10) {
+                            Text("Intensité")
+                                .font(.caption)
+                                .foregroundColor(PTTheme.textSecondary)
+                            Slider(value: $backgroundOpacity, in: 0.25...1.0, step: 0.05)
+                                .tint(PTTheme.accent)
+                            Text("\(Int(round(backgroundOpacity * 100)))%")
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundColor(PTTheme.accent)
+                                .frame(width: 40, alignment: .trailing)
                         }
                     }
                 }

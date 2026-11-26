@@ -20,6 +20,7 @@ xcrun --sdk macosx swiftc \
   "$REPO_ROOT/PowerTrack/EtapeEchauffement.swift" \
   "$REPO_ROOT/PowerTrack/SeanceExportDTO.swift" \
   "$REPO_ROOT/PowerTrack/BackupManager.swift" \
+  "$REPO_ROOT/PowerTrack/RankSystem.swift" \
   "$REPO_ROOT/Tests/PowerTrackCoreTests.swift" \
   -o "$OUT_BIN"
 

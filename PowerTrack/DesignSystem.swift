@@ -53,6 +53,78 @@ extension View {
     }
 }
 
+// MARK: - Fonds d'Écran Architecturaux Adaptatifs (Jour / Nuit)
+
+enum PTBackgroundStyle: String, CaseIterable, Identifiable {
+    case none
+    case chrono
+    case rim
+    case topo
+    
+    var id: String { rawValue }
+    
+    var label: String {
+        switch self {
+        case .none: return "Aucun"
+        case .chrono: return "Chrono"
+        case .rim: return "Disques"
+        case .topo: return "Courbes"
+        }
+    }
+    
+    var assetName: String? {
+        switch self {
+        case .none: return nil
+        case .chrono: return "AppBgChrono"
+        case .rim: return "AppBgCalibratedRim"
+        case .topo: return "AppBgTopography"
+        }
+    }
+}
+
+struct PTAppBackgroundView: View {
+    @AppStorage("pt_background_style") private var styleRaw: String = PTBackgroundStyle.chrono.rawValue
+    @AppStorage("pt_background_opacity") private var opacityValue: Double = 0.88
+    
+    private var style: PTBackgroundStyle {
+        PTBackgroundStyle(rawValue: styleRaw) ?? .chrono
+    }
+    
+    var body: some View {
+        ZStack {
+            PTTheme.bg
+            
+            if let assetName = style.assetName {
+                Image(assetName)
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(min(1.0, max(0.15, opacityValue)))
+                    .overlay(
+                        LinearGradient(
+                            stops: [
+                                .init(color: PTTheme.bg.opacity(0.54), location: 0.0),
+                                .init(color: PTTheme.bg.opacity(0.18), location: 0.52),
+                                .init(color: Color.clear, location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
+extension View {
+    /// Applique la toile de fond PowerTrack (adaptative Jour/Nuit avec motif optionnel).
+    func ptAppBackground() -> some View {
+        background {
+            PTAppBackgroundView()
+        }
+    }
+}
+
 // MARK: - Palette & Tokens Swiss Editorial / Flighty (Adaptatifs Jour / Nuit)
 
 enum PTTheme {

@@ -1,31 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "2026-08-13_15-59-05_Lumina.png",
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
-    },
-    {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "dark"
-        }
-      ],
-      "filename" : "2026-08-13_15-59-05_Lumina 1.png",
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
-    },
-    {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "tinted"
-        }
-      ],
-      "filename" : "2026-08-13_15-59-05_Lumina 2.png",
+      "filename" : "PowerTrackIcon.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

@@ -46,6 +46,15 @@ struct PerformanceDashboardView: View {
     // Saisie rapide poids de corps pour calcul DOTS / IPF GL
     @State private var isEditingBodyweight: Bool = false
     @State private var bodyweightDraft: String = ""
+    @State private var isShowingRankLadder: Bool = false
+    
+    private var scopedRankSnapshot: RankSnapshot {
+        RankCalculator.snapshot(
+            from: scopedBlocs,
+            bodyweightKg: exportManager.lastBodyweightKg,
+            competitionOnly: competitionUniquement
+        )
+    }
     
     private var selectedBloc: MacroBloc? {
         guard let selectedBlocID else { return nil }
@@ -77,6 +86,7 @@ struct PerformanceDashboardView: View {
                     }
                     
                     scopeFilterStrip
+                    rankOverviewSection
                     totalAndRecordsSection
                     e1rmEvolutionSection
                     tonnageHebdoSection
@@ -85,10 +95,21 @@ struct PerformanceDashboardView: View {
                 .padding(.vertical, 16)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(PTTheme.bg.ignoresSafeArea())
+            .ptAppBackground()
             .navigationTitle("Performance")
             .safeAreaInset(edge: .bottom) {
                 PTBottomOverlayStack(activeSeance: seanceEnCours)
+            }
+            .sheet(isPresented: $isShowingRankLadder) {
+                RankLadderSheetView(snapshot: scopedRankSnapshot)
+            }
+            .onAppear {
+                let globalSnap = RankCalculator.snapshot(
+                    from: blocs,
+                    bodyweightKg: exportManager.lastBodyweightKg,
+                    competitionOnly: true
+                )
+                RankStateManager.shared.syncBaselineIfNeeded(from: globalSnap)
             }
             .onChange(of: mouvementSelectionne) { _, _ in
                 selectedE1RMDate = nil
@@ -149,6 +170,76 @@ struct PerformanceDashboardView: View {
                         .stroke(isSelected ? Color.clear : PTTheme.hairline, lineWidth: 0.5)
                 )
                 .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+    
+    // MARK: - Aperçu Rang & Classement FFForce
+    
+    private var rankOverviewSection: some View {
+        let snap = scopedRankSnapshot
+        
+        return Button {
+            HapticAndSoundManager.shared.triggerLightImpact()
+            isShowingRankLadder = true
+        } label: {
+            VStack(spacing: 10) {
+                HStack(spacing: 14) {
+                    if let primary = snap.primaryDisplay {
+                        PTRankBadgeView(grade: primary.rank.grade, tier: primary.rank.tier, size: 54)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                PTKicker(text: "Rang · \(primary.scope)", color: primary.rank.grade.accentColor)
+                                PTFFForceTagPill(grade: primary.rank.grade)
+                            }
+                            
+                            Text(primary.rank.displayName)
+                                .font(.title3.weight(.heavy))
+                                .foregroundColor(PTTheme.textPrimary)
+                            
+                            if snap.hasCompleteSBD, let next = snap.nextGlobalTier, let kg = snap.kgToNextTier {
+                                Text("Prochain : \(next.displayName) (+\(PTFormat.weight(kg)) kg)")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundColor(PTTheme.textSecondary)
+                            } else if let bw = snap.bodyweightKg, bw > 0 {
+                                Text("PDC \(PTFormat.weight(bw)) kg · Voir les 7 grades")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundColor(PTTheme.textSecondary)
+                            }
+                        }
+                    } else {
+                        PTRankBadgeView(grade: .silver, tier: 1, size: 46, showPips: false, animateMythicAura: false)
+                        VStack(alignment: .leading, spacing: 3) {
+                            PTKicker(text: "Classement PowerTrack", color: PTTheme.accent)
+                            Text("7 Grades · Fer à INVICTUS")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundColor(PTTheme.textPrimary)
+                        }
+                    }
+                    
+                    Spacer(minLength: 6)
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(PTTheme.textTertiary)
+                }
+                
+                if snap.hasCompleteSBD {
+                    PTProgressHairline(
+                        ratio: snap.progressToNext,
+                        color: snap.globalRank?.grade.accentColor ?? PTTheme.accent
+                    )
+                }
+            }
+            .padding(14)
+            .background(PTTheme.surface.opacity(0.84))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke((snap.primaryDisplay?.rank.grade.accentColor ?? PTTheme.hairlineStrong).opacity(0.32), lineWidth: 0.75)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal, 16)
         }
         .buttonStyle(.plain)
     }
@@ -323,6 +414,9 @@ struct PerformanceDashboardView: View {
     
     private func recordColumn(mouvement: MouvementCompetition, value: Double, total: Double, dotColor: Color) -> some View {
         let share = total > 0 && value > 0 ? Int(round((value / total) * 100.0)) : 0
+        let liftRank = exportManager.lastBodyweightKg.flatMap { bw in
+            RankCalculator.liftRank(e1rmKg: value, bodyweightKg: bw, movement: parentTarget(for: mouvement))
+        }
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Circle()
@@ -337,10 +431,17 @@ struct PerformanceDashboardView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
             
-            Text(share > 0 ? "\(share)% du total" : "Aucune donnée")
-                .font(.system(size: 11).monospacedDigit())
-                .foregroundColor(PTTheme.textTertiary)
-                .lineLimit(1)
+            if let liftRank {
+                Text(liftRank.displayName)
+                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+                    .foregroundColor(liftRank.grade.accentColor)
+                    .lineLimit(1)
+            } else {
+                Text(share > 0 ? "\(share)% du total" : "Aucune donnée")
+                    .font(.system(size: 11).monospacedDigit())
+                    .foregroundColor(PTTheme.textTertiary)
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)

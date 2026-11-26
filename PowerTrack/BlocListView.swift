@@ -18,8 +18,13 @@ struct BlocListView: View {
     @State private var isShowingInitView = false
     @State private var isShowingProgramImport = false
     @State private var isShowingExportSettings = false
+    @State private var isShowingRankLadder = false
     @State private var messageConfirmation: String? = nil
     @State private var showingConfirmationAlert = false
+    
+    private var globalRankSnapshot: RankSnapshot {
+        RankCalculator.snapshot(from: blocs, bodyweightKg: exportManager.lastBodyweightKg, competitionOnly: true)
+    }
     
     private var seanceEnCours: Seance? {
         _ = progressTracker.lastUpdateToken
@@ -54,7 +59,7 @@ struct BlocListView: View {
                     .padding(.top, 8)
                 }
             }
-            .background(PTTheme.bg.ignoresSafeArea())
+            .ptAppBackground()
             .navigationTitle("Programmation")
             .safeAreaInset(edge: .bottom) {
                 PTBottomOverlayStack(activeSeance: seanceEnCours)
@@ -78,20 +83,54 @@ struct BlocListView: View {
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button(action: { isShowingInitView = true }) {
-                            Label("Nouveau Bloc Personnalisé", systemImage: "plus")
+                    HStack(spacing: 10) {
+                        Button {
+                            HapticAndSoundManager.shared.triggerLightImpact()
+                            isShowingRankLadder = true
+                        } label: {
+                            if let primary = globalRankSnapshot.primaryDisplay {
+                                HStack(spacing: 6) {
+                                    PTRankBadgeView(grade: primary.rank.grade, tier: primary.rank.tier, size: 22, showPips: false, animateMythicAura: false)
+                                    Text(primary.rank.displayName)
+                                        .font(.caption.weight(.bold))
+                                        .foregroundColor(PTTheme.textPrimary)
+                                    PTFFForceTagPill(grade: primary.rank.grade)
+                                }
+                                .padding(.leading, 6)
+                                .padding(.trailing, 6)
+                                .padding(.vertical, 3)
+                                .background(PTTheme.surfaceElevated)
+                                .overlay(
+                                    Capsule()
+                                        .stroke(primary.rank.grade.accentColor.opacity(0.4), lineWidth: 0.5)
+                                )
+                                .clipShape(Capsule())
+                            } else {
+                                Image(systemName: "shield.lefthalf.filled")
+                                    .font(.body)
+                                    .foregroundColor(PTTheme.textSecondary)
+                            }
                         }
+                        .accessibilityLabel("Classement et Rangs")
                         
-                        Button(action: { isShowingProgramImport = true }) {
-                            Label("Importer un Bloc JSON (Coach)", systemImage: "square.and.arrow.down")
+                        Menu {
+                            Button(action: { isShowingInitView = true }) {
+                                Label("Nouveau Bloc Personnalisé", systemImage: "plus")
+                            }
+                            
+                            Button(action: { isShowingProgramImport = true }) {
+                                Label("Importer un Bloc JSON (Coach)", systemImage: "square.and.arrow.down")
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.body.weight(.semibold))
+                                .foregroundColor(PTTheme.textPrimary)
                         }
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.body.weight(.semibold))
-                            .foregroundColor(PTTheme.textPrimary)
                     }
                 }
+            }
+            .onAppear {
+                RankStateManager.shared.syncBaselineIfNeeded(from: globalRankSnapshot)
             }
             .sheet(isPresented: $isShowingInitView) {
                 BlocInitView()
@@ -104,6 +143,9 @@ struct BlocListView: View {
             }
             .sheet(isPresented: $isShowingExportSettings) {
                 ExportSettingsView()
+            }
+            .sheet(isPresented: $isShowingRankLadder) {
+                RankLadderSheetView(snapshot: globalRankSnapshot)
             }
             .alert("Programmation", isPresented: $showingConfirmationAlert) {
                 Button("OK", role: .cancel) { }

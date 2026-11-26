@@ -57,6 +57,8 @@ struct SeanceDetailView: View {
                                     numeroExercice: exIndex + 1,
                                     exercice: exercice,
                                     meilleurE1RM: meilleurE1RMActuel(pour: exercice),
+                                    validatedSetsCount: seriesTriees.filter(\.estValidee).count,
+                                    totalSetsCount: seriesTriees.count,
                                     dernierePerformance: dernierePerformance(pour: exercice),
                                     onTapWarmup: {
                                         HapticAndSoundManager.shared.triggerLightImpact()
@@ -170,6 +172,15 @@ struct SeanceDetailView: View {
                     demanderAutorisationNotifications()
                     HapticAndSoundManager.shared.prepareGenerators()
                     
+                    if let allBlocs = try? modelContext.fetch(FetchDescriptor<MacroBloc>()) {
+                        let snap = RankCalculator.snapshot(
+                            from: allBlocs,
+                            bodyweightKg: ExportManager.shared.lastBodyweightKg,
+                            competitionOnly: true
+                        )
+                        RankStateManager.shared.syncBaselineIfNeeded(from: snap)
+                    }
+                    
                     expandedSerieID = prochaineSerieActive?.persistentModelID
                     
                     if let targetEx = prochainExerciceActif {
@@ -182,7 +193,7 @@ struct SeanceDetailView: View {
                 }
             }
         }
-        .background(PTTheme.bg.ignoresSafeArea())
+        .ptAppBackground()
         .navigationTitle(seance.titre ?? seance.date.formatted(date: .abbreviated, time: .omitted))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
@@ -353,6 +364,7 @@ struct SeanceDetailView: View {
             }
         }
         
+        let previousBest = meilleurE1RMPrecedent(pour: exercice, excluant: serie)
         let isPR = verifierEtEnregistrerPR(serie: serie, dans: exercice)
         let isTopSet = estUnTopSet(serie: serie, index: index, dans: exercice)
         
@@ -364,6 +376,22 @@ struct SeanceDetailView: View {
         
         try? modelContext.save()
         timerManager.startTimer(for: serie, exercice: exercice)
+        
+        if isPR, let currentE1RM = serie.calculerE1RM() {
+            RankStateManager.shared.showPRToast(
+                exerciseName: exercice.nom,
+                e1rmKg: currentE1RM,
+                deltaKg: max(0, currentE1RM - previousBest)
+            )
+        }
+        
+        if let allBlocs = try? modelContext.fetch(FetchDescriptor<MacroBloc>()) {
+            RankStateManager.shared.evaluateAfterSetValidation(
+                blocs: allBlocs,
+                bodyweightKg: ExportManager.shared.lastBodyweightKg,
+                validatedMovement: exercice.mouvementParent
+            )
+        }
         
         // Si l'exercice est terminé, auto-scroll vers le prochain exercice actif
         let toutesValideesDansExercice = series.allSatisfy(\.estValidee)
@@ -548,6 +576,8 @@ struct ExerciceSectionHeaderView: View {
     let numeroExercice: Int
     let exercice: Exercice
     let meilleurE1RM: Double?
+    var validatedSetsCount: Int = 0
+    var totalSetsCount: Int = 0
     var dernierePerformance: String? = nil
     let onTapWarmup: () -> Void
     var onAddSet: () -> Void = {}
@@ -585,6 +615,18 @@ struct ExerciceSectionHeaderView: View {
                         .font(.caption.weight(.semibold).monospacedDigit())
                         .foregroundColor(PTTheme.accent)
                         .lineLimit(1)
+                }
+                
+                if totalSetsCount > 0 {
+                    let isExerciseDone = validatedSetsCount == totalSetsCount
+                    Text(isExerciseDone ? "✓ \(validatedSetsCount)/\(totalSetsCount)" : "\(validatedSetsCount)/\(totalSetsCount)")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(isExerciseDone ? PTTheme.success : PTTheme.textSecondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(isExerciseDone ? PTTheme.success.opacity(0.14) : PTTheme.surface)
+                        .clipShape(Capsule())
+                        .animation(.snappy(duration: 0.25), value: isExerciseDone)
                 }
                 
                 Menu {
@@ -670,6 +712,13 @@ struct SerieCompactRowView: View {
     let onValidateSerie: () -> Void
     var onDeleteSerie: (() -> Void)? = nil
     
+    @State private var rippleScale: CGFloat = 0.7
+    @State private var rippleOpacity: Double = 0
+    @State private var sweepOffset: CGFloat = -360
+    @State private var sweepOpacity: Double = 0
+    @State private var floatingWeightOffset: CGFloat = 6
+    @State private var floatingWeightOpacity: Double = 0
+    
     private let rpeOptions: [Double] = [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
     
     private var rowIndexLabel: String {
@@ -745,12 +794,20 @@ struct SerieCompactRowView: View {
                 }
                 .buttonStyle(.plain)
                 
-                // Bouton de validation circulaire (26pt)
+                // Bouton de validation circulaire (26pt) + animation tactile discrète
                 Button(action: onValidateSerie) {
                     ZStack {
+                        if rippleOpacity > 0 {
+                            Circle()
+                                .stroke(PTTheme.success, lineWidth: 2)
+                                .frame(width: 26, height: 26)
+                                .scaleEffect(rippleScale)
+                                .opacity(rippleOpacity)
+                        }
+                        
                         if serie.estValidee {
                             Circle()
-                                .fill(PTTheme.textPrimary)
+                                .fill(PTTheme.success)
                                 .frame(width: 26, height: 26)
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .bold))
@@ -763,6 +820,17 @@ struct SerieCompactRowView: View {
                     }
                     .frame(width: 34, height: 34)
                     .contentShape(Circle())
+                    .overlay(alignment: .leading) {
+                        if floatingWeightOpacity > 0, let charge = serie.chargeSaisie, charge > 0 {
+                            Text("+\(PTFormat.weight(charge)) kg")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(PTTheme.success)
+                                .fixedSize()
+                                .offset(x: -58, y: floatingWeightOffset)
+                                .opacity(floatingWeightOpacity)
+                                .allowsHitTesting(false)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(serie.estValidee ? "Série validée" : "Valider la série")
@@ -879,7 +947,22 @@ struct SerieCompactRowView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(isNextActiveSet || isExpanded ? PTTheme.surface : Color.clear)
+        .background(
+            ZStack {
+                isNextActiveSet || isExpanded ? PTTheme.surface : Color.clear
+                if sweepOpacity > 0 {
+                    LinearGradient(
+                        colors: [.clear, PTTheme.success.opacity(0.26), .clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: 160)
+                    .offset(x: sweepOffset)
+                    .opacity(sweepOpacity)
+                }
+            }
+            .clipped()
+        )
         .overlay(alignment: .leading) {
             if isNextActiveSet {
                 Rectangle()
@@ -887,12 +970,40 @@ struct SerieCompactRowView: View {
                     .frame(width: 2)
             }
         }
-        .opacity(serie.estValidee ? 0.48 : 1.0)
+        .opacity(serie.estValidee ? 0.54 : 1.0)
         .animation(.snappy(duration: 0.25), value: serie.estValidee)
         .animation(.snappy(duration: 0.25), value: isExpanded)
+        .onChange(of: serie.estValidee) { _, nowValidated in
+            if nowValidated {
+                triggerValidationBurst()
+            }
+        }
     }
     
     // MARK: - Helpers
+    
+    private func triggerValidationBurst() {
+        rippleScale = 0.75
+        rippleOpacity = 0.95
+        withAnimation(.easeOut(duration: 0.48)) {
+            rippleScale = 1.9
+            rippleOpacity = 0
+        }
+        
+        sweepOffset = -260
+        sweepOpacity = 1.0
+        withAnimation(.easeOut(duration: 0.55)) {
+            sweepOffset = 260
+            sweepOpacity = 0
+        }
+        
+        floatingWeightOffset = 6
+        floatingWeightOpacity = 1.0
+        withAnimation(.easeOut(duration: 0.85)) {
+            floatingWeightOffset = -18
+            floatingWeightOpacity = 0
+        }
+    }
     
     private func ajusterCharge(_ delta: Double) {
         HapticAndSoundManager.shared.triggerSelection()

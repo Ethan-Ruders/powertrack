@@ -44,6 +44,7 @@ struct PowerTrackCoreTestRunner {
         try testProgramJSONImporter()
         try testExportManagerDTOAndRessenti()
         try testBackupExportAndRestoreRoundTrip()
+        try testRankSystemAndFFForceTags()
         
         print("✅ All \(testsPassed) assertions passed cleanly!")
     }
@@ -605,5 +606,73 @@ struct PowerTrackCoreTestRunner {
         checkApprox(restoredTop.chargeSaisie, 147.5, "Charge restaurée")
         checkApprox(restoredTop.rpeSaisi, 7.5, "RPE saisi restauré")
         checkApprox(ExportManager.shared.loadRessenti(for: restoredSeance).poidsCorpsKg, 75.0, "Ressenti associé restauré")
+    }
+    
+    // MARK: - 11. Système de Rangs 7×3, INVICTUS & FFForce
+    
+    static func testRankSystemAndFFForceTags() throws {
+        check(RankGrade.allCases.count == 7, "7 grades au total")
+        check(RankTier.allTiers.count == 21, "21 paliers (7×3)")
+        for i in 1..<RankTier.allTiers.count {
+            check(RankTier.allTiers[i].minDots > RankTier.allTiers[i - 1].minDots, "Seuils DOTS strictement croissants")
+        }
+        
+        check(RankGrade.iron.ffforceTag == "Débutant", "Fer FFF tag")
+        check(RankGrade.bronze.ffforceTag == "Club", "Bronze FFF tag")
+        check(RankGrade.silver.ffforceTag == "FFF · Dép.", "Argent FFF tag")
+        check(RankGrade.gold.ffforceTag == "FFF · Régional", "Or FFF tag")
+        check(RankGrade.platinum.ffforceTag == "FFF · National", "Platine FFF tag")
+        check(RankGrade.diamond.ffforceTag == "FFF · Élite", "Diamant FFF tag")
+        check(RankGrade.invictus.ffforceTag == "FFF · Intl.", "INVICTUS FFF tag")
+        check(RankGrade.invictus.displayName == "INVICTUS", "Dernier rang nommé INVICTUS")
+        
+        // Résolution DOTS sur le profil de l'athlète @ 74.5 kg
+        let dots485 = PowerliftingScoring.dotsMale(totalKg: 485, bodyweightKg: 74.5)!
+        check(RankCalculator.tier(forDOTS: dots485).displayName == "Argent III", "485 kg @ 74.5 -> Argent III")
+        
+        let dots490 = PowerliftingScoring.dotsMale(totalKg: 490, bodyweightKg: 74.5)!
+        check(RankCalculator.tier(forDOTS: dots490).displayName == "Or I", "490 kg @ 74.5 -> Or I")
+        
+        let dots585 = PowerliftingScoring.dotsMale(totalKg: 585, bodyweightKg: 74.5)!
+        check(RankCalculator.tier(forDOTS: dots585).displayName == "Platine I", "585 kg @ 74.5 -> Platine I")
+        
+        let dots670 = PowerliftingScoring.dotsMale(totalKg: 670, bodyweightKg: 74.5)!
+        check(RankCalculator.tier(forDOTS: dots670).displayName == "Diamant I", "670 kg @ 74.5 -> Diamant I")
+        
+        let dots755 = PowerliftingScoring.dotsMale(totalKg: 755, bodyweightKg: 74.5)!
+        check(RankCalculator.tier(forDOTS: dots755).displayName == "INVICTUS I", "755 kg @ 74.5 -> INVICTUS I")
+        
+        let benchRank = RankCalculator.liftRank(e1rmKg: 130, bodyweightKg: 74.5, movement: .bench)
+        check(benchRank?.grade == .gold && benchRank?.tier == 2, "Bench 130 kg @ 74.5 -> Or II")
+        
+        // Test promotion silencieuse via RankStateManager
+        let suiteName = "pt_rank_test_\(UUID().uuidString)"
+        let testDefaults = UserDefaults(suiteName: suiteName)!
+        defer { testDefaults.removePersistentDomain(forName: suiteName) }
+        let mgr = RankStateManager(defaults: testDefaults)
+        
+        let cfg = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: MacroBloc.self, configurations: cfg)
+        let ctx = ModelContext(container)
+        
+        let bloc = MacroBloc(nom: "Test Rank")
+        let sem = Semaine(numero: 1, nom: "S1"); sem.macroBloc = bloc
+        let seance = Seance(date: Date(), titre: "J1"); seance.semaine = sem
+        let exSq = Exercice(nom: "Squat Compétition", categorie: .competition, ordre: 0); exSq.seance = seance
+        let exBn = Exercice(nom: "Bench Compétition", categorie: .competition, ordre: 1); exBn.seance = seance
+        let exDl = Exercice(nom: "Deadlift Compétition", categorie: .competition, ordre: 2); exDl.seance = seance
+        let sSq = Serie(repsCibles: 1, rpeCible: 10, chargeSaisie: 165, rpeSaisi: 10, estValidee: true); sSq.exercice = exSq
+        let sBn = Serie(repsCibles: 1, rpeCible: 10, chargeSaisie: 130, rpeSaisi: 10, estValidee: true); sBn.exercice = exBn
+        let sDl = Serie(repsCibles: 1, rpeCible: 10, chargeSaisie: 190, rpeSaisi: 10, estValidee: true); sDl.exercice = exDl
+        ctx.insert(bloc)
+        
+        let initialSnap = RankCalculator.snapshot(from: [bloc], bodyweightKg: 74.5)
+        mgr.syncBaselineIfNeeded(from: initialSnap)
+        check(mgr.activePromotion == nil, "Sync initiale ne déclenche pas de popup")
+        
+        sBn.chargeSaisie = 135
+        mgr.evaluateAfterSetValidation(blocs: [bloc], bodyweightKg: 74.5, validatedMovement: .bench)
+        check(mgr.activePromotion?.newTier.displayName == "Or I", "Franchissement 490 kg déclenche Or I")
+        check(mgr.activePromotion?.isDivisionPromotion == true, "Argent III -> Or I est une promotion de grade")
     }
 }

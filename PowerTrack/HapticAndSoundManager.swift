@@ -69,6 +69,22 @@ final class HapticAndSoundManager {
         }
     }
     
+    /// Promotion de grade / palier : séquence haptique uniquement (strictement silencieuse).
+    func triggerRankUpHaptic(isMythic: Bool) {
+        lightImpactGenerator.impactOccurred(intensity: 0.7)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.48) { [weak self] in
+            self?.heavyImpactGenerator.impactOccurred(intensity: 1.0)
+            self?.notificationGenerator.notificationOccurred(.success)
+            self?.heavyImpactGenerator.prepare()
+        }
+        if isMythic {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.64) { [weak self] in
+                self?.heavyImpactGenerator.impactOccurred(intensity: 1.0)
+                self?.heavyImpactGenerator.prepare()
+            }
+        }
+    }
+    
     // MARK: - Audio Non-Intrusif (Playback + Mix & Ducking)
     
     /// Configure la session audio au repos sans baisser le volume de la musique tant qu'aucune alerte n'est jouée.

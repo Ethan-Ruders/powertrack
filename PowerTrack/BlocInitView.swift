@@ -76,7 +76,6 @@ struct BlocInitView: View {
             .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Nouveau Bloc")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annuler") {
@@ -85,7 +84,7 @@ struct BlocInitView: View {
                     .foregroundColor(PTTheme.textSecondary)
                 }
             }
-            .preferredColorScheme(.dark)
+            .ptAppearance()
             .alert("Erreur", isPresented: $showingErrorAlert) {
                 Button("OK", role: .cancel) { }
             } message: {

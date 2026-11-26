@@ -59,8 +59,7 @@ struct ProgramImportSheet: View {
             .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Importer un Bloc JSON")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .preferredColorScheme(.dark)
+            .ptAppearance()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annuler") {

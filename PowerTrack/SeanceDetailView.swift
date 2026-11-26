@@ -186,7 +186,6 @@ struct SeanceDetailView: View {
         .navigationTitle(seance.titre ?? seance.date.formatted(date: .abbreviated, time: .omitted))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .preferredColorScheme(.dark)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: {
@@ -1137,8 +1136,7 @@ struct ExerciceEditorSheet: View {
             .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle(isEditing ? "Modifier l'exercice" : "Nouvel exercice")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .preferredColorScheme(.dark)
+            .ptAppearance()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annuler") { dismiss() }

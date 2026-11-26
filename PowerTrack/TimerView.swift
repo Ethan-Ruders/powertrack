@@ -105,7 +105,7 @@ struct TimerView: View {
                     .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
             )
             .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.45), radius: 14, y: 6)
+            .shadow(color: PTTheme.floatingShadow, radius: 14, y: 6)
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))

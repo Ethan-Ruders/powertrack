@@ -66,8 +66,7 @@ struct SeanceExportSheet: View {
             .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Ressentis & Export")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .preferredColorScheme(.dark)
+            .ptAppearance()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Fermer") {

@@ -8,7 +8,7 @@
 
 - **Objectif :** Application iOS native et sur-mesure de suivi de **force athlétique (Powerlifting)** pour usage personnel.
 - **Stack technique :**
-  - **UI :** SwiftUI (`preferredColorScheme(.dark)`), esthétique **Swiss Editorial / Flighty** centralisée dans `DesignSystem.swift` (`PTTheme`: fond encre profond `#09090B`, surfaces `#111114` / `#18181C`, filets `0.5pt`, texte primaire blanc craie `#F5F5F7`, accent cuivre mat `#DE7A42` utilisé avec parcimonie), pensée pour une utilisation en salle avec téléphone souvent verrouillé.
+  - **UI :** SwiftUI (mode **Jour / Nuit adaptatif** suivant iOS par défaut via `PTAppearanceMode` dans `DesignSystem.swift` : `Système` / `Jour` / `Nuit`), esthétique **Swiss Editorial / Flighty** (`PTTheme`: fond papier `#FAFAFB` en jour / encre `#09090B` en nuit, surfaces adaptatives, filets `0.5pt`, cuivre mat `#C6622A` jour / `#DE7A42` nuit), pensée pour une utilisation en salle avec téléphone souvent verrouillé.
   - **Persistance locale :** SwiftData (`ModelContainer` sur `MacroBloc.self`) + `UserDefaults` pour l'état de séance en cours (`SeanceProgressTracker`). Fonctionnement **100 % hors-ligne** pendant l'entraînement.
   - **Graphiques :** Swift Charts (`PerformanceDashboardView`).
   - **Arrière-plan & Écran verrouillé :** `ActivityKit`, `WidgetKit`, `AppIntents`, `UserNotifications`, `AVFoundation` / `AudioToolbox` (ducking audio non-intrusif) et `UIKit` haptique.
@@ -25,7 +25,7 @@ Le projet utilise `PBXFileSystemSynchronizedRootGroup` dans `PowerTrack.xcodepro
 
 - **Cible `PowerTrack`** (`com.ethanruders.PowerTrack`, `IPHONEOS_DEPLOYMENT_TARGET = 26.5`, Swift 5.0, aucune dépendance SwiftPM externe) :
   - `PowerTrackApp.swift` — Point d'entrée `@main`, configure `.modelContainer(for: MacroBloc.self)`.
-  - `DesignSystem.swift` — Palette `PTTheme` (`#09090B` / `#F5F5F7` / `#DE7A42`), primitives éditoriales (`PTHairline`, `PTKicker`, `PTProgressHairline`), boutons capsule (`PTPrimaryPillButtonStyle`, `PTSecondaryPillButtonStyle`), formatage (`PTFormat`) et calculateur de disques (`PTBarbellPlateHelper`).
+  - `DesignSystem.swift` — Tokens adaptatifs Jour/Nuit `PTTheme`, gestion du thème `PTAppearanceMode` (`.ptAppearance()`), primitives éditoriales (`PTHairline`, `PTKicker`, `PTProgressHairline`), boutons capsule (`PTPrimaryPillButtonStyle`, `PTSecondaryPillButtonStyle`), formatage (`PTFormat`) et calculateur de disques (`PTBarbellPlateHelper`).
   - `ContentView.swift` — `TabView` à 2 onglets : **Programmation** (`BlocListView`) et **Performance** (`PerformanceDashboardView`).
   - `models.swift` — Modèles SwiftData (`MacroBloc`, `Semaine`, `Seance`, `Exercice`, `Serie` avec `ordre` + `seriesTriees`), classification unifiée `MouvementParent`, scores `PowerliftingScoring` (`dotsMale`, `ipfGLMaleClassic`), suivi `SeanceProgressTracker`, et moteur RPE (`pourcentagePour`, `calculerCharge`).
   - `BlocListView.swift` — Liste des blocs, menu de création / import JSON coach, accès aux réglages serveur (badge file hors-ligne), suppression par menu contextuel, et bannière flottante `ResumeWorkoutBannerView`.
@@ -44,11 +44,11 @@ Le projet utilise `PBXFileSystemSynchronizedRootGroup` dans `PowerTrack.xcodepro
   - `RestTimerActivityManager.swift` — Gestionnaire `@MainActor` (`LiveActivityManager` aliasé) pour démarrer, prolonger (`+30s`) et clôturer proprement la Live Activity sans activité orpheline.
   - `RestTimerAppIntents.swift` — `AjouterTempsIntent` et `PasserReposIntent` (`LiveActivityIntent`) partagés entre les deux cibles et routés vers `TimerManager.shared`.
   - `PerformanceDashboardView.swift` — Onglet Performance interactif (`.chartXSelection` sur e1RM et tonnage, filtre multi-blocs et Compétition/Variantes, Total SBD estimé + DOTS / IPF GL, bandeau RPE hebdo).
-  - `SeanceExportDTO.swift`, `SeanceExportSheet.swift`, `ExportSettingsView.swift` & `BackupManager.swift` — Contrat JSON v2 (`SeanceExportDTO`), token API chiffré dans le Trousseau iOS (`Keychain`), auto-synchro hors-ligne (`NWPathMonitor` + retour premier plan), badges de synchro, et sauvegarde/restauration complète locale (`.json`).
+  - `SeanceExportDTO.swift`, `SeanceExportSheet.swift`, `ExportSettingsView.swift` & `BackupManager.swift` — Contrat JSON v2 (`SeanceExportDTO`), choix d'apparence `Système / Jour / Nuit`, token API chiffré dans le Trousseau iOS (`Keychain`), auto-synchro hors-ligne (`NWPathMonitor` + retour premier plan), badges de synchro, et sauvegarde/restauration complète locale (`.json`).
 
 - **Cible `PowerTrackWidgetsExtension`** (`com.ethanruders.PowerTrack.PowerTrackWidgets`, `IPHONEOS_DEPLOYMENT_TARGET = 26.5`, `NSSupportsLiveActivities = YES`) :
   - `PowerTrackWidgetsBundle.swift` — Bundle `@main` enregistrant `RestTimerLiveActivityWidget`.
-  - `PowerTrackWidgetsLiveActivity.swift` — UI Écran verrouillé (`RestTimerLiveActivityView`) & Dynamic Island (états expanded, compact, minimal) avec compte à rebours natif `Text(timerInterval: context.state.timerRange)` et boutons interactifs `AjouterTempsIntent` (`+30s`) / `PasserReposIntent` (`Passer`).
+  - `PowerTrackWidgetsLiveActivity.swift` — UI Écran verrouillé (`RestTimerLiveActivityView`, adaptative Jour/Nuit) & Dynamic Island (sombre fixe, états expanded, compact, minimal) avec compte à rebours natif `Text(timerInterval: context.state.timerRange)` et boutons interactifs `RetirerTempsIntent` (`-30s`) / `AjouterTempsIntent` (`+30s`) / `PasserReposIntent` (`Passer`).
 
 ---
 

@@ -93,7 +93,6 @@ struct BlocListView: View {
                     }
                 }
             }
-            .preferredColorScheme(.dark)
             .sheet(isPresented: $isShowingInitView) {
                 BlocInitView()
             }
@@ -277,7 +276,7 @@ struct ResumeWorkoutBannerView: View {
                     .stroke(PTTheme.hairlineStrong, lineWidth: 0.5)
             )
             .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.45), radius: 14, y: 6)
+            .shadow(color: PTTheme.floatingShadow, radius: 14, y: 6)
         }
         .buttonStyle(.plain)
         .simultaneousGesture(

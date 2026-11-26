@@ -87,8 +87,6 @@ struct PerformanceDashboardView: View {
             .scrollDismissesKeyboard(.interactively)
             .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Performance")
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .preferredColorScheme(.dark)
             .safeAreaInset(edge: .bottom) {
                 PTBottomOverlayStack(activeSeance: seanceEnCours)
             }
@@ -552,7 +550,7 @@ struct PerformanceDashboardView: View {
                         .chartForegroundStyleScale([
                             "Compétition": PTTheme.accent,
                             "Variante": PTTheme.textSecondary,
-                            "Accessoire": PTTheme.surfaceElevated
+                            "Accessoire": PTTheme.chartMuted
                         ])
                         .chartLegend(position: .bottom, alignment: .leading, spacing: 12)
                         .chartYAxis {

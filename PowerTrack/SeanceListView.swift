@@ -36,7 +36,6 @@ struct SeanceListView: View {
         .background(PTTheme.bg.ignoresSafeArea())
         .navigationTitle(semaine.nom)
         .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(.dark)
         .safeAreaInset(edge: .bottom) {
             PTBottomOverlayStack(activeSeance: seanceEnCours)
         }

@@ -286,7 +286,7 @@ struct SeanceSummarySheet: View {
             .sheet(isPresented: $isShowingExportSheet) {
                 SeanceExportSheet(seance: seance)
             }
-            .preferredColorScheme(.dark)
+            .ptAppearance()
         }
     }
     

@@ -42,7 +42,6 @@ struct SemaineListView: View {
         .background(PTTheme.bg.ignoresSafeArea())
         .navigationTitle(macroBloc.nom)
         .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(.dark)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -208,8 +207,7 @@ struct BlocEditSheet: View {
             .background(PTTheme.bg.ignoresSafeArea())
             .navigationTitle("Modifier le bloc")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .preferredColorScheme(.dark)
+            .ptAppearance()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annuler") {

@@ -14,6 +14,7 @@ struct ExportSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var exportManager = ExportManager.shared
+    @AppStorage("pt_appearance_mode") private var appearanceModeRaw: String = PTAppearanceMode.system.rawValue
     
     @State private var isTesting = false
     @State private var isFlushing = false
@@ -33,6 +34,7 @@ struct ExportSettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
+                    appearanceSection
                     webhookSection
                     authSection
                     testAndStatusSection
@@ -43,10 +45,9 @@ struct ExportSettingsView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(PTTheme.bg.ignoresSafeArea())
-            .navigationTitle("Serveur Linux & Export")
+            .navigationTitle("Réglages & Export")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .preferredColorScheme(.dark)
+            .ptAppearance()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fermer") {
@@ -104,6 +105,52 @@ struct ExportSettingsView: View {
     }
     
     // MARK: - Sections Éditoriales
+    
+    private var appearanceSection: some View {
+        let selectedMode = PTAppearanceMode(rawValue: appearanceModeRaw) ?? .system
+        
+        return VStack(alignment: .leading, spacing: 10) {
+            PTKicker(text: "Apparence")
+                .padding(.horizontal, 16)
+            
+            VStack(spacing: 0) {
+                PTHairline()
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Suit automatiquement le mode jour / nuit de l'iPhone par défaut.")
+                        .font(.caption)
+                        .foregroundColor(PTTheme.textSecondary)
+                    
+                    HStack(spacing: 8) {
+                        ForEach(PTAppearanceMode.allCases) { mode in
+                            let isSelected = (mode == selectedMode)
+                            Button {
+                                HapticAndSoundManager.shared.triggerSelection()
+                                appearanceModeRaw = mode.rawValue
+                            } label: {
+                                Text(mode.label)
+                                    .font(.caption.weight(isSelected ? .bold : .medium))
+                                    .foregroundColor(isSelected ? PTTheme.bg : PTTheme.textSecondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 9)
+                                    .background(isSelected ? PTTheme.textPrimary : PTTheme.surface)
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(isSelected ? Color.clear : PTTheme.hairline, lineWidth: 0.5)
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                
+                PTHairline()
+            }
+        }
+    }
     
     private var webhookSection: some View {
         VStack(alignment: .leading, spacing: 10) {

@@ -6,24 +6,134 @@
 //
 
 import SwiftUI
+import UIKit
 
-// MARK: - Palette & Tokens Swiss Editorial / Flighty
+// MARK: - Mode d'Apparence (Système / Jour / Nuit)
+
+enum PTAppearanceMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+    
+    var id: String { rawValue }
+    
+    var label: String {
+        switch self {
+        case .system: return "Système"
+        case .light: return "Jour"
+        case .dark: return "Nuit"
+        }
+    }
+    
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
+struct PTAppearanceModifier: ViewModifier {
+    @AppStorage("pt_appearance_mode") private var modeRaw: String = PTAppearanceMode.system.rawValue
+    
+    private var resolvedScheme: ColorScheme? {
+        (PTAppearanceMode(rawValue: modeRaw) ?? .system).colorScheme
+    }
+    
+    func body(content: Content) -> some View {
+        content.preferredColorScheme(resolvedScheme)
+    }
+}
+
+extension View {
+    /// Applique le mode d'apparence choisi (Système par défaut, Jour ou Nuit).
+    func ptAppearance() -> some View {
+        modifier(PTAppearanceModifier())
+    }
+}
+
+// MARK: - Palette & Tokens Swiss Editorial / Flighty (Adaptatifs Jour / Nuit)
 
 enum PTTheme {
-    static let bg = Color(red: 0.035, green: 0.035, blue: 0.043)              // #09090B
-    static let surface = Color(red: 0.067, green: 0.067, blue: 0.078)         // #111114
-    static let surfaceElevated = Color(red: 0.094, green: 0.094, blue: 0.110) // #18181C
+    private static func dynamic(light: UIColor, dark: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        })
+    }
     
-    static let hairline = Color.white.opacity(0.09)
-    static let hairlineStrong = Color.white.opacity(0.16)
+    /// Toile de fond principale — Encre profonde (#09090B) / Papier éditorial (#FAFAFB)
+    static let bg = dynamic(
+        light: UIColor(red: 0.980, green: 0.980, blue: 0.984, alpha: 1.0),
+        dark: UIColor(red: 0.035, green: 0.035, blue: 0.043, alpha: 1.0)
+    )
     
-    static let textPrimary = Color(red: 0.961, green: 0.961, blue: 0.969)     // #F5F5F7
-    static let textSecondary = Color(red: 0.541, green: 0.541, blue: 0.580)   // #8A8A94
-    static let textTertiary = Color(red: 0.369, green: 0.369, blue: 0.408)    // #5E5E68
+    /// Surface secondaire subtile — #111114 / #F2F2F5
+    static let surface = dynamic(
+        light: UIColor(red: 0.949, green: 0.949, blue: 0.961, alpha: 1.0),
+        dark: UIColor(red: 0.067, green: 0.067, blue: 0.078, alpha: 1.0)
+    )
     
-    static let accent = Color(red: 0.871, green: 0.478, blue: 0.259)          // #DE7A42 (Cuivre mat)
-    static let success = Color(red: 0.290, green: 0.871, blue: 0.502)         // #4ADE80
-    static let danger = Color(red: 0.937, green: 0.267, blue: 0.267)          // #EF4444
+    /// Surface surélevée (pilules flottantes, boutons secondaires, contrôles) — #18181C / #FFFFFF
+    static let surfaceElevated = dynamic(
+        light: UIColor(red: 1.000, green: 1.000, blue: 1.000, alpha: 1.0),
+        dark: UIColor(red: 0.094, green: 0.094, blue: 0.110, alpha: 1.0)
+    )
+    
+    /// Filets éditoriaux 0.5pt
+    static let hairline = dynamic(
+        light: UIColor(red: 0.035, green: 0.035, blue: 0.043, alpha: 0.09),
+        dark: UIColor(white: 1.0, alpha: 0.09)
+    )
+    
+    static let hairlineStrong = dynamic(
+        light: UIColor(red: 0.035, green: 0.035, blue: 0.043, alpha: 0.16),
+        dark: UIColor(white: 1.0, alpha: 0.16)
+    )
+    
+    /// Hiérarchie typographique — Blanc craie (#F5F5F7) / Encre profonde (#09090B)
+    static let textPrimary = dynamic(
+        light: UIColor(red: 0.035, green: 0.035, blue: 0.043, alpha: 1.0),
+        dark: UIColor(red: 0.961, green: 0.961, blue: 0.969, alpha: 1.0)
+    )
+    
+    static let textSecondary = dynamic(
+        light: UIColor(red: 0.369, green: 0.369, blue: 0.408, alpha: 1.0),
+        dark: UIColor(red: 0.541, green: 0.541, blue: 0.580, alpha: 1.0)
+    )
+    
+    static let textTertiary = dynamic(
+        light: UIColor(red: 0.557, green: 0.557, blue: 0.596, alpha: 1.0),
+        dark: UIColor(red: 0.369, green: 0.369, blue: 0.408, alpha: 1.0)
+    )
+    
+    /// Accent cuivre mat — #DE7A42 en nuit / #C6622A plus contrasté en jour
+    static let accent = dynamic(
+        light: UIColor(red: 0.776, green: 0.384, blue: 0.165, alpha: 1.0),
+        dark: UIColor(red: 0.871, green: 0.478, blue: 0.259, alpha: 1.0)
+    )
+    
+    static let success = dynamic(
+        light: UIColor(red: 0.086, green: 0.639, blue: 0.290, alpha: 1.0),
+        dark: UIColor(red: 0.290, green: 0.871, blue: 0.502, alpha: 1.0)
+    )
+    
+    static let danger = dynamic(
+        light: UIColor(red: 0.863, green: 0.149, blue: 0.149, alpha: 1.0),
+        dark: UIColor(red: 0.937, green: 0.267, blue: 0.267, alpha: 1.0)
+    )
+    
+    /// Teinte discrète pour la série « Accessoire » dans les graphiques empilés
+    static let chartMuted = dynamic(
+        light: UIColor(red: 0.831, green: 0.831, blue: 0.863, alpha: 1.0),
+        dark: UIColor(red: 0.165, green: 0.165, blue: 0.196, alpha: 1.0)
+    )
+    
+    /// Ombre douce adaptée aux pilules flottantes
+    static let floatingShadow = dynamic(
+        light: UIColor(red: 0.035, green: 0.035, blue: 0.043, alpha: 0.12),
+        dark: UIColor.black.withAlphaComponent(0.45)
+    )
 }
 
 // MARK: - Primitives Éditoriales Réutilisables

@@ -284,7 +284,7 @@ struct EchauffementSheetView: View {
                     .fontWeight(.semibold)
                 }
             }
-            .preferredColorScheme(.dark)
+            .ptAppearance()
             .onAppear {
                 if poidsVise == nil {
                     poidsVise = exercice.chargeCibleTopSet

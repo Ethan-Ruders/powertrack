@@ -69,7 +69,7 @@ struct SeanceListView: View {
         let validated = seance.validatedSeriesCount
         let total = seance.totalSeriesCount
         let isDone = total > 0 && validated == total
-        let isInProgress = validated > 0 && !isDone
+        let isInProgress = (validated > 0 && !isDone) || progressTracker.isSeanceInProgressToday(seance)
         let isSynced = exportManager.isSeanceExported(seance)
         let isPending = exportManager.isSeancePendingExport(seance)
         

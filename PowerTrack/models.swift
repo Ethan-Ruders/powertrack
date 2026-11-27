@@ -409,8 +409,23 @@ final class SeanceProgressTracker: ObservableObject {
     private let startTimePrefix = "pt_seance_start_time_"
     private let endTimePrefix = "pt_seance_end_time_"
     private let closedPrefix = "pt_seance_closed_"
+    private let explicitlyStartedPrefix = "pt_seance_started_"
     
     private init() {}
+    
+    /// Démarre explicitement la séance avant la validation de la première série.
+    func startSeance(_ seance: Seance) {
+        let key = seance.trackingKey
+        let now = Date()
+        defaults.set(now, forKey: activeDatePrefix + key)
+        defaults.set(false, forKey: closedPrefix + key)
+        defaults.set(true, forKey: explicitlyStartedPrefix + key)
+        if defaults.object(forKey: startTimePrefix + key) == nil {
+            defaults.set(now, forKey: startTimePrefix + key)
+        }
+        defaults.removeObject(forKey: endTimePrefix + key)
+        lastUpdateToken = UUID()
+    }
     
     /// Enregistre qu'une série de cette séance a été validée aujourd'hui
     func recordSetValidation(for seance: Seance) {
@@ -424,10 +439,11 @@ final class SeanceProgressTracker: ObservableObject {
         lastUpdateToken = UUID()
     }
     
-    /// Met à jour le suivi local lorsqu'une série est dévalidée (réinitialise si aucune série n'est plus validée).
+    /// Met à jour le suivi local lorsqu'une série est dévalidée (réinitialise si aucune série n'est plus validée, sauf si démarrée manuellement).
     func recordSetUnvalidation(for seance: Seance) {
         let key = seance.trackingKey
-        if seance.validatedSeriesCount == 0 {
+        let startedManually = defaults.bool(forKey: explicitlyStartedPrefix + key)
+        if seance.validatedSeriesCount == 0 && !startedManually {
             defaults.removeObject(forKey: activeDatePrefix + key)
             defaults.removeObject(forKey: startTimePrefix + key)
             defaults.removeObject(forKey: endTimePrefix + key)
@@ -468,21 +484,40 @@ final class SeanceProgressTracker: ObservableObject {
     func markSeanceClosed(_ seance: Seance) {
         let key = seance.trackingKey
         defaults.set(true, forKey: closedPrefix + key)
+        defaults.set(false, forKey: explicitlyStartedPrefix + key)
         defaults.set(Date(), forKey: endTimePrefix + key)
         lastUpdateToken = UUID()
     }
     
-    /// Indique si la séance est en cours aujourd'hui (au moins 1 série validée et non clôturée)
+    /// Efface les clés locales de suivi pour une séance (utile pour réinitialisation / tests).
+    func resetTracking(for seance: Seance) {
+        let key = seance.trackingKey
+        defaults.removeObject(forKey: activeDatePrefix + key)
+        defaults.removeObject(forKey: startTimePrefix + key)
+        defaults.removeObject(forKey: endTimePrefix + key)
+        defaults.removeObject(forKey: closedPrefix + key)
+        defaults.removeObject(forKey: explicitlyStartedPrefix + key)
+        lastUpdateToken = UUID()
+    }
+    
+    /// Indique si la séance est en cours aujourd'hui (démarrée explicitement ou au moins 1 série validée, et non clôturée)
     func isSeanceInProgressToday(_ seance: Seance) -> Bool {
-        let validated = seance.validatedSeriesCount
-        guard validated > 0 else { return false }
-        
         let key = seance.trackingKey
         if defaults.bool(forKey: closedPrefix + key) {
             return false
         }
         
         let calendar = Calendar.current
+        if defaults.bool(forKey: explicitlyStartedPrefix + key) {
+            if let activeDate = defaults.object(forKey: activeDatePrefix + key) as? Date {
+                return calendar.isDateInToday(activeDate)
+            }
+            return true
+        }
+        
+        let validated = seance.validatedSeriesCount
+        guard validated > 0 else { return false }
+        
         if let activeDate = defaults.object(forKey: activeDatePrefix + key) as? Date {
             return calendar.isDateInToday(activeDate)
         }

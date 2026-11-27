@@ -16,6 +16,7 @@ struct SeanceDetailView: View {
     @State private var isShowingSummarySheet = false
     @State private var isShowingExportSheet = false
     @State private var dateDebutSeance: Date? = nil
+    @State private var dateFinSeance: Date? = nil
     @State private var prSerieIDs: Set<PersistentIdentifier> = []
     
     // Série dont le tiroir d'édition rapide est actuellement déplié
@@ -44,12 +45,29 @@ struct SeanceDetailView: View {
         VStack(spacing: 0) {
             SeanceProgressHeaderView(
                 seance: seance,
-                dateDebutSeance: dateDebutSeance
+                dateDebutSeance: dateDebutSeance,
+                dateFinSeance: dateFinSeance
             )
             
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
+                        if dateDebutSeance == nil {
+                            Button(action: demarrerSeance) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "play.fill")
+                                        .font(.caption.weight(.bold))
+                                    Text("Commencer la séance")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PTPrimaryPillButtonStyle())
+                            .padding(.horizontal, 20)
+                            .padding(.top, 14)
+                            .padding(.bottom, 6)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                        
                         ForEach(Array(exercicesTries.enumerated()), id: \.element.persistentModelID) { exIndex, exercice in
                             let seriesTriees = exercice.seriesTriees
                             VStack(alignment: .leading, spacing: 0) {
@@ -154,6 +172,7 @@ struct SeanceDetailView: View {
                                 HapticAndSoundManager.shared.triggerPRValidated()
                                 timerManager.stopTimer()
                                 SeanceProgressTracker.shared.markSeanceClosed(seance)
+                                dateFinSeance = SeanceProgressTracker.shared.sessionEndDate(for: seance)
                                 isShowingSummarySheet = true
                             }) {
                                 Text("Terminer la séance")
@@ -169,6 +188,7 @@ struct SeanceDetailView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .onAppear {
                     dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
+                    dateFinSeance = SeanceProgressTracker.shared.sessionEndDate(for: seance)
                     demanderAutorisationNotifications()
                     HapticAndSoundManager.shared.prepareGenerators()
                     
@@ -293,6 +313,7 @@ struct SeanceDetailView: View {
         }
         SeanceProgressTracker.shared.recordSetUnvalidation(for: seance)
         dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
+        dateFinSeance = SeanceProgressTracker.shared.sessionEndDate(for: seance)
         try? modelContext.save()
     }
     
@@ -314,10 +335,20 @@ struct SeanceDetailView: View {
         }
         SeanceProgressTracker.shared.recordSetUnvalidation(for: seance)
         dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
+        dateFinSeance = SeanceProgressTracker.shared.sessionEndDate(for: seance)
         try? modelContext.save()
     }
     
-    // MARK: - Logique Métier (Validation, Propagation, PR, Auto-Scroll)
+    // MARK: - Logique Métier (Démarrage, Validation, Propagation, PR, Auto-Scroll)
+    
+    private func demarrerSeance() {
+        HapticAndSoundManager.shared.triggerSetValidated()
+        withAnimation(.snappy(duration: 0.25)) {
+            SeanceProgressTracker.shared.startSeance(seance)
+            dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
+            dateFinSeance = nil
+        }
+    }
     
     private func gererValidationSerie(
         serie: Serie,
@@ -341,6 +372,7 @@ struct SeanceDetailView: View {
             prSerieIDs.remove(serie.persistentModelID)
             SeanceProgressTracker.shared.recordSetUnvalidation(for: seance)
             dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
+            dateFinSeance = SeanceProgressTracker.shared.sessionEndDate(for: seance)
             HapticAndSoundManager.shared.triggerLightImpact()
             try? modelContext.save()
             return
@@ -353,6 +385,7 @@ struct SeanceDetailView: View {
         hideKeyboard()
         SeanceProgressTracker.shared.recordSetValidation(for: seance)
         dateDebutSeance = SeanceProgressTracker.shared.sessionStartDate(for: seance)
+        dateFinSeance = SeanceProgressTracker.shared.sessionEndDate(for: seance)
         
         // Propagation intelligente vers la série N+1 si sa charge est vide
         let series = exercice.seriesTriees
@@ -1052,6 +1085,7 @@ struct CompactStepButton: View {
 struct SeanceProgressHeaderView: View {
     let seance: Seance
     let dateDebutSeance: Date?
+    var dateFinSeance: Date? = nil
     
     private var totalSeries: Int { seance.totalSeriesCount }
     private var seriesValidees: Int { seance.validatedSeriesCount }
@@ -1067,12 +1101,22 @@ struct SeanceProgressHeaderView: View {
                 
                 Spacer()
                 
-                if let start = dateDebutSeance {
+                if let start = dateDebutSeance, let end = dateFinSeance {
+                    Text(formatDuration(from: start, to: end))
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundColor(PTTheme.success)
+                        .lineLimit(1)
+                } else if let start = dateDebutSeance {
                     TimelineView(.periodic(from: start, by: 1.0)) { context in
-                        Text(formatDuration(from: start, to: context.date))
-                            .font(.caption.weight(.semibold).monospacedDigit())
-                            .foregroundColor(PTTheme.textSecondary)
-                            .lineLimit(1)
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(PTTheme.accent)
+                                .frame(width: 6, height: 6)
+                            Text(formatDuration(from: start, to: context.date))
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundColor(PTTheme.textSecondary)
+                                .lineLimit(1)
+                        }
                     }
                 } else {
                     Text("Prêt")

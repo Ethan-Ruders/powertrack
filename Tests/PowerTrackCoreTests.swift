@@ -46,6 +46,7 @@ struct PowerTrackCoreTestRunner {
         try testExportManagerDTOAndRessenti()
         try testBackupExportAndRestoreRoundTrip()
         try testRankSystemAndFFForceTags()
+        try testExplicitSessionStartAndClose()
         
         print("✅ All \(testsPassed) assertions passed cleanly!")
     }
@@ -686,5 +687,41 @@ struct PowerTrackCoreTestRunner {
         mgr.evaluateAfterSetValidation(blocs: [bloc], bodyweightKg: 74.5, validatedMovement: .bench)
         check(mgr.activePromotion?.newTier.displayName == "Or I", "Franchissement 490 kg déclenche Or I")
         check(mgr.activePromotion?.isDivisionPromotion == true, "Argent III -> Or I est une promotion de grade")
+    }
+    
+    // MARK: - 12. Démarrage & Clôture Explicite de Séance
+    
+    static func testExplicitSessionStartAndClose() throws {
+        let cfg = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: MacroBloc.self, configurations: cfg)
+        let ctx = ModelContext(container)
+        
+        let bloc = MacroBloc(nom: "Bloc Session Test")
+        let sem = Semaine(numero: 1, nom: "S1"); sem.macroBloc = bloc
+        let seance = Seance(date: Date(), titre: "Jour Start Explicit")
+        seance.semaine = sem
+        let ex = Exercice(nom: "Bench Compétition", categorie: .competition, ordre: 0); ex.seance = seance
+        let s1 = Serie(repsCibles: 4, rpeCible: 8.0, chargeSaisie: 100.0, estValidee: false, ordre: 0); s1.exercice = ex
+        ctx.insert(bloc)
+        
+        let tracker = SeanceProgressTracker.shared
+        tracker.resetTracking(for: seance)
+        defer { tracker.resetTracking(for: seance) }
+        
+        check(tracker.sessionStartDate(for: seance) == nil, "Avant démarrage: aucune date de début")
+        check(tracker.isSeanceInProgressToday(seance) == false, "Avant démarrage: pas en cours")
+        
+        tracker.startSeance(seance)
+        check(tracker.sessionStartDate(for: seance) != nil, "startSeance initialise la date de début")
+        check(tracker.isSeanceInProgressToday(seance) == true, "startSeance active la séance même à 0 série validée")
+        check(tracker.findActiveSeance(in: [bloc])?.trackingKey == seance.trackingKey, "findActiveSeance retourne la séance démarrée")
+        
+        tracker.recordSetUnvalidation(for: seance)
+        check(tracker.sessionStartDate(for: seance) != nil, "Dévalidation à 0 série conserve le chrono d'une séance démarrée manuellement")
+        
+        tracker.markSeanceClosed(seance)
+        check(tracker.sessionEndDate(for: seance) != nil, "markSeanceClosed enregistre l'heure de fin")
+        check(tracker.sessionDurationMinutes(for: seance) != nil, "Durée calculée après clôture")
+        check(tracker.isSeanceInProgressToday(seance) == false, "Séance clôturée n'est plus en cours")
     }
 }

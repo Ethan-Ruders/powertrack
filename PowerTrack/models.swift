@@ -96,10 +96,31 @@ nonisolated enum PowerliftingScoring {
         return ((totalKg * 500.0) / denom * 100.0).rounded() / 100.0
     }
     
+    /// Calcule le score DOTS officiel féminin.
+    static func dotsFemale(totalKg: Double, bodyweightKg: Double) -> Double? {
+        guard totalKg > 0, bodyweightKg > 0 else { return nil }
+        let bw = bodyweightKg
+        let denom = -57.96288
+            + 13.6175032 * bw
+            - 0.1126655495 * pow(bw, 2)
+            + 0.0005158568 * pow(bw, 3)
+            - 0.0000010706 * pow(bw, 4)
+        guard denom > 0 else { return nil }
+        return ((totalKg * 500.0) / denom * 100.0).rounded() / 100.0
+    }
+    
     /// Calcule le score IPF Goodlift officiel masculin Classic (3-lift raw).
     static func ipfGLMaleClassic(totalKg: Double, bodyweightKg: Double) -> Double? {
         guard totalKg > 0, bodyweightKg > 0 else { return nil }
         let denom = 1199.72839 - 1025.18162 * exp(-0.00921 * bodyweightKg)
+        guard denom > 0 else { return nil }
+        return ((totalKg * 100.0) / denom * 100.0).rounded() / 100.0
+    }
+    
+    /// Calcule le score IPF Goodlift officiel féminin Classic (3-lift raw).
+    static func ipfGLFemaleClassic(totalKg: Double, bodyweightKg: Double) -> Double? {
+        guard totalKg > 0, bodyweightKg > 0 else { return nil }
+        let denom = 610.32796 - 1045.59282 * exp(-0.03048 * bodyweightKg)
         guard denom > 0 else { return nil }
         return ((totalKg * 100.0) / denom * 100.0).rounded() / 100.0
     }

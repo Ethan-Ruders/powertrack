@@ -139,6 +139,29 @@ struct PowerTrackCoreTestRunner {
         checkApprox(ipf, 76.08, tolerance: 0.01, "IPF GL Classic officiel 520 kg @ 74.5 kg")
         check(PowerliftingScoring.dotsMale(totalKg: 0, bodyweightKg: 74.5) == nil, "DOTS nil si total nul")
         check(PowerliftingScoring.ipfGLMaleClassic(totalKg: 520, bodyweightKg: 0) == nil, "IPF GL nil si pdc nul")
+        
+        // Références officielles Femmes (350 kg @ 63 kg et 420 kg @ 76 kg)
+        let dotsF1 = PowerliftingScoring.dotsFemale(totalKg: 350.0, bodyweightKg: 63.0)
+        let ipfF1 = PowerliftingScoring.ipfGLFemaleClassic(totalKg: 350.0, bodyweightKg: 63.0)
+        checkApprox(dotsF1, 376.43, tolerance: 0.01, "DOTS Femmes 350 kg @ 63 kg")
+        checkApprox(ipfF1, 76.57, tolerance: 0.01, "IPF GL Femmes 350 kg @ 63 kg")
+        
+        let dotsF2 = PowerliftingScoring.dotsFemale(totalKg: 420.0, bodyweightKg: 76.0)
+        let ipfF2 = PowerliftingScoring.ipfGLFemaleClassic(totalKg: 420.0, bodyweightKg: 76.0)
+        checkApprox(dotsF2, 406.23, tolerance: 0.01, "DOTS Femmes 420 kg @ 76 kg")
+        checkApprox(ipfF2, 82.81, tolerance: 0.01, "IPF GL Femmes 420 kg @ 76 kg")
+        
+        if let f = dotsF1, let m = PowerliftingScoring.dotsMale(totalKg: 350.0, bodyweightKg: 63.0) {
+            check(f > m, "À charge et PDC identiques, DOTS Femmes > DOTS Hommes")
+        }
+        
+        check(PowerliftingScoring.dotsFemale(totalKg: 0, bodyweightKg: 63.0) == nil, "DOTS Femmes nil si total nul")
+        check(PowerliftingScoring.dotsFemale(totalKg: -10, bodyweightKg: 63.0) == nil, "DOTS Femmes nil si total négatif")
+        check(PowerliftingScoring.dotsFemale(totalKg: 350.0, bodyweightKg: 0) == nil, "DOTS Femmes nil si pdc nul")
+        check(PowerliftingScoring.dotsFemale(totalKg: 350.0, bodyweightKg: 2.0) == nil, "DOTS Femmes nil si dénominateur <= 0")
+        check(PowerliftingScoring.ipfGLFemaleClassic(totalKg: 0, bodyweightKg: 63.0) == nil, "IPF GL Femmes nil si total nul")
+        check(PowerliftingScoring.ipfGLFemaleClassic(totalKg: 350.0, bodyweightKg: 0) == nil, "IPF GL Femmes nil si pdc nul")
+        check(PowerliftingScoring.ipfGLFemaleClassic(totalKg: 350.0, bodyweightKg: 10.0) == nil, "IPF GL Femmes nil si dénominateur <= 0")
     }
     
     // MARK: - 6. Génération Paliers Échauffement
